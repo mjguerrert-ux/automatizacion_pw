@@ -87,7 +87,8 @@ qué revistas entran, o refrescar el ranking de impacto), correr
 
 - **C.** Consecución del PDF (OpenAlex/Unpaywall + fallback a working paper).
 - **D.** Generación de la ficha estructurada en español con la API de Claude.
-- **E.** Envío por WhatsApp (Twilio o Meta Cloud API).
+- **E.** Envío por WhatsApp — ✅ implementado (`src/whatsapp/`, compartido con
+  el pipeline de oportunidades), pendiente conectarlo aquí una vez existan C y D.
 - **F.** Automatización (cron / GitHub Actions), 2–3 veces por semana.
 
 ---
@@ -122,9 +123,13 @@ src/opportunities/
   extract.py    # Parte B: verifica cada candidato (web_fetch) y arma la ficha
   format.py     # Arma el mensaje de WhatsApp con la ficha fija
   store.py      # Evita reenviar una oportunidad ya notificada en corridas previas
+src/whatsapp/
+  client.py     # Parte E: envío por WhatsApp vía Twilio (compartido con papers)
 scripts/
   discover_test_opportunities.py  # Parte A: prueba solo el descubrimiento
-  run_opportunities_test.py       # Corrida completa: descubre + verifica + arma ficha
+  run_opportunities_test.py       # Corrida de prueba: descubre + verifica + imprime la ficha (no envía)
+  send_opportunities.py           # Corrida real: descubre + verifica + ENVÍA por WhatsApp
+  send_test_whatsapp.py           # Prueba de humo de Twilio, compartida con el pipeline de papers
 ```
 
 ### Ficha (formato fijo del mensaje)
@@ -160,19 +165,65 @@ pip install -r requirements.txt
 # Solo descubrimiento (Parte A)
 ANTHROPIC_API_KEY=sk-ant-... python scripts/discover_test_opportunities.py
 
-# Corrida completa: descubre, verifica y muestra los mensajes de WhatsApp
+# Corrida de prueba: descubre, verifica y solo IMPRIME los mensajes (no envía)
 ANTHROPIC_API_KEY=sk-ant-... python scripts/run_opportunities_test.py
+
+# Corrida real: descubre, verifica y ENVÍA por WhatsApp cada oportunidad nueva
+ANTHROPIC_API_KEY=sk-ant-... \
+    TWILIO_ACCOUNT_SID=AC... TWILIO_AUTH_TOKEN=... \
+    TWILIO_WHATSAPP_TO=whatsapp:+573001234567 \
+    python scripts/send_opportunities.py
 ```
 
 Cada corrida guarda en `data/opportunities_seen.json` (no versionado) los
-links ya notificados, para no repetir la misma oportunidad en la siguiente
-corrida mientras siga abierta.
+links ya notificados/enviados, para no repetir la misma oportunidad en la
+siguiente corrida mientras siga abierta. `send_opportunities.py` solo marca
+una oportunidad como vista después de que el envío por WhatsApp fue exitoso;
+si Twilio falla, se reintenta en la próxima corrida.
 
 ### Limitaciones conocidas / próximos pasos
 
 - La cobertura depende de qué tan bien indexadas estén las páginas de los
-  labs/profesores en los motores de búsqueda que usa `web_search`; no hay
-  garantía de encontrar el 100% de las convocatorias abiertas.
-- Todavía no envía nada por WhatsApp: eso es la Parte E, compartida con el
-  pipeline de papers (Twilio o Meta Cloud API), y la Parte F de
-  automatización (cron / GitHub Actions) tampoco está implementada.
+  labs/profesores/organismos en los motores de búsqueda que usa `web_search`;
+  no hay garantía de encontrar el 100% de las convocatorias abiertas.
+- Falta la Parte F: automatización (cron / GitHub Actions) para correr
+  `send_opportunities.py` 2–3 veces por semana sin intervención manual.
+
+---
+
+## Envío por WhatsApp (Parte E)
+
+Módulo compartido por ambos pipelines (`src/whatsapp/client.py`), vía la API
+de WhatsApp de [Twilio](https://www.twilio.com/docs/whatsapp/quickstart/python).
+
+**Setup (una sola vez):**
+1. Crear una cuenta de Twilio (el sandbox de WhatsApp es gratis para probar).
+2. En la consola de Twilio: Messaging → Try it out → Send a WhatsApp message,
+   y unir tu número al sandbox mandando el código indicado por WhatsApp al
+   número de sandbox de Twilio.
+3. Copiar `Account SID` y `Auth Token` de la consola.
+
+**Variables de entorno:**
+
+| Variable | Obligatoria | Descripción |
+|---|---|---|
+| `TWILIO_ACCOUNT_SID` | sí | Desde la consola de Twilio. |
+| `TWILIO_AUTH_TOKEN` | sí | Desde la consola de Twilio. |
+| `TWILIO_WHATSAPP_TO` | sí | Número destino, formato `whatsapp:+<código país><número>`. |
+| `TWILIO_WHATSAPP_FROM` | no | Por defecto usa el número de sandbox de Twilio. Solo hace falta si tienes un número de WhatsApp Business propio. |
+
+```bash
+# Prueba de humo: manda un mensaje de texto suelto
+TWILIO_ACCOUNT_SID=AC... TWILIO_AUTH_TOKEN=... \
+    TWILIO_WHATSAPP_TO=whatsapp:+573001234567 \
+    python scripts/send_test_whatsapp.py
+```
+
+**Límite:** Twilio permite hasta 1600 caracteres por mensaje de WhatsApp;
+`send_whatsapp_message` levanta `WhatsAppError` si el mensaje lo supera (las
+fichas de oportunidades caben cómodamente dentro de ese límite).
+
+**Nota sobre el sandbox:** mientras no se verifique un número de WhatsApp
+Business propio, el sandbox de Twilio solo entrega mensajes a números que ya
+se unieron a él (paso 2 arriba) — sirve para desarrollo/pruebas personales,
+no para mandarle el pipeline a otra persona sin que también se una.
