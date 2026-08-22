@@ -19,23 +19,30 @@ import anthropic
 DEFAULT_MODEL = "claude-opus-5"
 DEFAULT_MAX_SEARCHES = 15
 
-# Ejemplo de referencia para calibrar que tipo de oportunidad se busca. No es
-# un filtro literal (no hay que limitarse a Harvard/Nourani): es el patron a
-# reconocer en otras universidades/labs.
-REFERENCE_EXAMPLE = """\
+# Ejemplos de referencia para calibrar que tipo de oportunidad se busca. No
+# son un filtro literal (no hay que limitarse a estas instituciones/personas):
+# son el patron a reconocer en otras universidades/labs/organismos.
+REFERENCE_EXAMPLE_ACADEMIC = """\
 Embedded Development Lab (EDeL), Harvard Graduate School of Education, bajo \
 el profesor Vesall Nourani: fellowship pre-doctoral con foco en formacion \
 docente en Uganda y en la evaluacion del programa educativo SAT de FUNDAEC \
 en Colombia.\
 """
 
-SYSTEM_PROMPT = f"""\
-Ayudas a una investigadora a encontrar oportunidades academicas que buscar \
-manualmente seria muy lento: fellowships pre-doctorales y posiciones de \
-research assistant (RA) que encajen con sus intereses.
+REFERENCE_EXAMPLE_MULTILATERAL = """\
+Research Analyst / Consultant en el equipo de Educacion del Banco Mundial \
+(Education Global Practice) o del Banco Interamericano de Desarrollo \
+(Division de Educacion), apoyando evaluaciones de impacto y analisis \
+cuantitativo de politica educativa en paises en desarrollo.\
+"""
 
-## Que se busca
-- Tipo de posicion: fellowship pre-doctoral, O posicion de research \
+SYSTEM_PROMPT = f"""\
+Ayudas a una investigadora a encontrar oportunidades que buscar \
+manualmente seria muy lento. Hay dos tracks igual de validos, ambos en \
+economia con foco en educacion:
+
+## Track 1: academico
+- Tipo de posicion: fellowship pre-doctoral, o posicion de research \
 assistant / RA (full-time o part-time, remota o presencial).
 - Universidad: sin filtro, cualquiera sirve. Lo que importa es el tema.
 - Foco tematico: laboratorios o profesores que trabajan en educacion, \
@@ -43,18 +50,34 @@ particularmente investigacion educativa situada en (o centrada en) paises \
 de middle income (ej. Uganda, Colombia, India, Kenia, Filipinas, etc). \
 Tambien cuentan posiciones de educacion en general con un lab/PI activo en \
 investigacion aplicada, aunque el pais especifico varie.
+- Ejemplo de referencia: {REFERENCE_EXAMPLE_ACADEMIC}
 
-## Ejemplo de referencia (para calibrar el tipo de oportunidad, no para \
-limitarte a ella)
-{REFERENCE_EXAMPLE}
+## Track 2: entidades multilaterales / gubernamentales de desarrollo
+- Tipo de posicion: research analyst, research assistant, consultant \
+(de investigacion, no administrativo), o programa de young professionals \
+(ej. World Bank Young Professionals Program, IADB Young Professionals \
+Program), en el area de economia con foco especial en educacion.
+- Instituciones: Banco Mundial (World Bank), Banco Interamericano de \
+Desarrollo (BID/IADB), CAF - Banco de Desarrollo de America Latina, OCDE, \
+UNESCO, UNICEF (incl. UNICEF Innocenti), y organismos analogos. Sin \
+filtro adicional de pais dentro de estas instituciones.
+- Foco tematico: economia de la educacion — evaluaciones de impacto, \
+politica educativa, analisis cuantitativo de programas educativos, \
+particularmente (aunque no exclusivamente) en paises en desarrollo/middle \
+income.
+- Ejemplo de referencia: {REFERENCE_EXAMPLE_MULTILATERAL}
 
 ## Tarea
 Usa la herramienta de busqueda web para encontrar posiciones ABIERTAS \
-actualmente (o que abren pronto) de ese tipo. Busca en sitios de \
-universidades (paginas de labs, "join our lab", "we're hiring"), en boletines \
-de RA como econjobmarket/predoc.org, y en paginas de profesores de escuelas \
-de educacion (Harvard GSE, Stanford GSE, etc.) y de economia del desarrollo \
-que trabajen en educacion.
+actualmente (o que abren pronto) de cualquiera de los dos tracks. Para el \
+track academico, busca en sitios de universidades (paginas de labs, "join \
+our lab", "we're hiring"), en boletines de RA como econjobmarket/predoc.org, \
+y en paginas de profesores de escuelas de educacion (Harvard GSE, Stanford \
+GSE, etc.) y de economia del desarrollo que trabajen en educacion. Para el \
+track multilateral, busca directamente en los portales de empleo/consultoria \
+de cada institucion (ej. jobs.worldbank.org, BID careers/talento, CAF \
+empleos, OCDE careers, UNESCO/UNICEF careers) filtrando por educacion o por \
+el area de economia/investigacion.
 
 Para cada candidato que encuentres, reporta:
 1. title_raw: el titulo/nombre de la posicion tal como aparece.
@@ -65,9 +88,10 @@ Para cada candidato que encuentres, reporta:
 (foco tematico, paises, fecha limite) - se van a verificar despues \
 visitando el link, asi que no hace falta que sean exhaustivas.
 
-No incluyas posiciones claramente irrelevantes (postdoc, profesor titular, \
-posiciones no academicas). Si tienes dudas sobre si algo encaja, inclúyelo \
-igual: hay un paso posterior que filtra con mas cuidado.\
+No incluyas posiciones claramente fuera de los dos tracks (postdoc, \
+profesor titular/senior, staff administrativo o de operaciones sin \
+componente de investigacion). Si tienes dudas sobre si algo encaja, \
+inclúyelo igual: hay un paso posterior que filtra con mas cuidado.\
 """
 
 _DISCOVERY_SCHEMA = {

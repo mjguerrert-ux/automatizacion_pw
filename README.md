@@ -98,10 +98,16 @@ Pipeline paralelo al de papers: recibe automáticamente por WhatsApp
 fellowships pre-doctorales y posiciones de research assistant (RA) que
 encajen con los intereses de la usuaria, en la misma ficha fija de siempre.
 
-**Tipo de posición:** fellowship pre-doctoral, o RA. **Universidad:** sin
-filtro. **Foco temático:** educación, particularmente investigación de
-profesores/labs que trabajan en países de middle income (ej. Uganda,
-Colombia) — ver el ejemplo de referencia abajo.
+Cubre dos tracks, ambos en economía con foco en educación:
+
+- **Académico:** fellowship pre-doctoral o RA, en cualquier universidad,
+  con foco en profesores/labs que trabajan en educación en países de
+  middle income (ej. Uganda, Colombia) — ver el ejemplo de referencia abajo.
+- **Entidades multilaterales / gubernamentales de desarrollo:** research
+  analyst, research assistant, consultant de investigación, o programas de
+  young professionals (ej. WBG YPP, IADB YPP) en Banco Mundial, BID/IADB,
+  CAF, OCDE, UNESCO, UNICEF y organismos análogos, en el área de economía
+  de la educación.
 
 No existe un equivalente a OpenAlex para este tipo de oportunidades (no hay
 una base de datos única y estructurada de fellowships/RA), así que este
@@ -132,13 +138,19 @@ scripts/
 7. ✅ Requisitos clave
 8. 🔗 Link para aplicar
 
-### Ejemplo de referencia
+### Ejemplos de referencia
 
-Embedded Development Lab (Harvard Graduate School of Education), bajo el
-profesor Vesall Nourani: fellowship pre-doctoral con foco en formación
-docente en Uganda y en la evaluación del programa educativo SAT de FUNDAEC
-en Colombia. No es un filtro literal — es el patrón a reconocer en otras
-universidades/labs.
+No son un filtro literal — son el patrón a reconocer en otras
+universidades/labs/organismos.
+
+- **Académico:** Embedded Development Lab (Harvard Graduate School of
+  Education), bajo el profesor Vesall Nourani: fellowship pre-doctoral con
+  foco en formación docente en Uganda y en la evaluación del programa
+  educativo SAT de FUNDAEC en Colombia.
+- **Multilateral:** Research Analyst / Consultant en el equipo de
+  Educación del Banco Mundial (Education Global Practice) o del BID
+  (División de Educación), apoyando evaluaciones de impacto y análisis
+  cuantitativo de política educativa en países en desarrollo.
 
 ### Uso
 
