@@ -6,6 +6,15 @@ cada uno, visita la pagina fuente (server tool `web_fetch`) para confirmar
 que es una oportunidad real y vigente, decidir si encaja con los criterios
 de la usuaria, y extraer los 8 campos de la ficha fija que se manda por
 Telegram. No arma el mensaje en si: eso es `opportunities.format`.
+
+Verifica en lotes (`batch_size` candidatos por llamada a la API), no todos
+los candidatos en un solo turno: con muchos candidatos (ej. 42), un turno
+que hace un `web_fetch` detras de otro para cada uno puede terminar en
+`pause_turn` (turno largo que Claude corta a mitad de camino) antes de
+devolver el JSON final - pasó en la corrida real del 22/08 con 42
+candidatos. Si un lote entero falla (pause_turn, rechazo), se descarta ese
+lote en vez de abortar toda la corrida (sus candidatos no quedan marcados
+como vistos, asi que se reintentan solos en la proxima corrida).
 """
 
 from __future__ import annotations
@@ -18,6 +27,7 @@ import anthropic
 from opportunities.discovery import Candidate
 
 DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_BATCH_SIZE = 8
 
 SYSTEM_PROMPT = """\
 Verificas y estructuras oportunidades para una investigadora en economia \
@@ -174,23 +184,14 @@ def _format_candidates(candidates: list[Candidate]) -> str:
     return "\n\n".join(blocks)
 
 
-def extract_fichas(
-    candidates: list[Candidate],
-    model: str = DEFAULT_MODEL,
-    effort: str = "high",
-    api_key: str | None = None,
-) -> ExtractResult:
-    """Verifica cada candidato visitando su URL fuente y arma la ficha final.
-
-    `effort` por defecto es "high": decidir relevancia con criterio (dos \
-    condiciones simultaneas) y extraer datos precisos de paginas reales se \
-    beneficia de mas cuidado que una clasificacion simple sobre texto dado.
-    """
-    if not candidates:
-        raise ExtractError("No hay candidatos para verificar.")
-
-    client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
-
+def _extract_batch(
+    client: anthropic.Anthropic,
+    batch: list[Candidate],
+    model: str,
+    effort: str,
+) -> tuple[list[OpportunityEvaluation], dict]:
+    """Verifica un solo lote (una llamada a la API). candidate_index en el
+    resultado es local al lote (0-indexado dentro de `batch`)."""
     response = client.messages.create(
         model=model,
         max_tokens=16000,
@@ -203,15 +204,15 @@ def extract_fichas(
             {
                 "type": "web_fetch_20260209",
                 "name": "web_fetch",
-                "max_uses": len(candidates) * 2,
+                "max_uses": len(batch) * 2,
             },
             {
                 "type": "web_search_20260209",
                 "name": "web_search",
-                "max_uses": len(candidates),
+                "max_uses": len(batch),
             },
         ],
-        messages=[{"role": "user", "content": _format_candidates(candidates)}],
+        messages=[{"role": "user", "content": _format_candidates(batch)}],
     )
 
     if response.stop_reason == "refusal":
@@ -222,7 +223,7 @@ def extract_fichas(
     if response.stop_reason == "pause_turn":
         raise ExtractError(
             "La verificacion se pauso a mitad de camino (pause_turn) y este "
-            "cliente no la reanuda automaticamente. Prueba con menos candidatos."
+            "cliente no la reanuda automaticamente."
         )
 
     text = next((b.text for b in response.content if b.type == "text"), None)
@@ -252,4 +253,57 @@ def extract_fichas(
                 ficha=ficha,
             )
         )
-    return ExtractResult(evaluations=evaluations, raw=data)
+    return evaluations, data
+
+
+def extract_fichas(
+    candidates: list[Candidate],
+    model: str = DEFAULT_MODEL,
+    effort: str = "high",
+    api_key: str | None = None,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> ExtractResult:
+    """Verifica cada candidato visitando su URL fuente y arma la ficha final.
+
+    `effort` por defecto es "high": decidir relevancia con criterio (dos \
+    condiciones simultaneas) y extraer datos precisos de paginas reales se \
+    beneficia de mas cuidado que una clasificacion simple sobre texto dado.
+
+    Llama a la API en lotes de `batch_size` candidatos (ver docstring del \
+    modulo) en vez de mandar todos los candidatos en un solo turno. Si un \
+    lote falla, se descarta y se sigue con el resto - no aborta la corrida \
+    completa por un lote problematico.
+    """
+    if not candidates:
+        raise ExtractError("No hay candidatos para verificar.")
+
+    client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
+
+    all_evaluations: list[OpportunityEvaluation] = []
+    raw_batches = []
+    failed_batches = 0
+    for start in range(0, len(candidates), batch_size):
+        batch = candidates[start : start + batch_size]
+        try:
+            batch_evaluations, batch_raw = _extract_batch(client, batch, model, effort)
+        except ExtractError:
+            failed_batches += 1
+            continue
+
+        for ev in batch_evaluations:
+            all_evaluations.append(
+                OpportunityEvaluation(
+                    candidate_index=start + ev.candidate_index,
+                    is_relevant=ev.is_relevant,
+                    reasoning=ev.reasoning,
+                    ficha=ev.ficha,
+                )
+            )
+        raw_batches.append(batch_raw)
+
+    if not all_evaluations:
+        raise ExtractError(
+            f"Los {failed_batches} lote(s) de verificacion fallaron (pause_turn/rechazo)."
+        )
+
+    return ExtractResult(evaluations=all_evaluations, raw={"batches": raw_batches})
