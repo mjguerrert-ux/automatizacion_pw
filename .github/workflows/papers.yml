@@ -1,0 +1,56 @@
+name: Papers académicos por Telegram
+
+# Parte F del pipeline de papers: corre send_papers.py solo, 3 veces por
+# semana (lunes/martes/jueves), sin intervención manual. Usa un bot de
+# Telegram separado del de oportunidades (chats distintos).
+#
+# IMPORTANTE: los triggers de "schedule" solo se disparan desde la version
+# de este archivo que este en la rama default del repo (normalmente main) -
+# hay que mergear esta rama para que el cron quede activo. "workflow_dispatch"
+# si se puede correr manualmente desde cualquier rama que tenga este archivo,
+# util para probar antes de mergear.
+#
+# Requiere estos secrets del repo (Settings > Secrets and variables >
+# Actions > New repository secret): ANTHROPIC_API_KEY, OPENALEX_MAILTO,
+# TELEGRAM_BOT_TOKEN_PAPERS, TELEGRAM_CHAT_ID_PAPERS. Ver README > Envío
+# por Telegram para como conseguir el token/chat_id (crear un bot nuevo,
+# distinto al de oportunidades).
+
+on:
+  schedule:
+    # 12:00 UTC = 7:00am hora Colombia (UTC-5), lunes/martes/jueves.
+    - cron: "0 12 * * 1,2,4"
+  workflow_dispatch: {}
+
+jobs:
+  send-papers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # data/papers_sent.json no esta versionado (es estado, no codigo) y
+      # cada corrida del workflow arranca desde un checkout limpio, asi que
+      # se persiste entre corridas con un cache - mismo patron que
+      # opportunities.yml.
+      - name: Restaurar papers ya enviados
+        uses: actions/cache@v4
+        with:
+          path: data/papers_sent.json
+          key: papers-sent-${{ github.run_id }}
+          restore-keys: |
+            papers-sent-
+
+      - name: Filtrar, conseguir PDF, generar ficha y enviar por Telegram
+        env:
+          OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN_PAPERS: ${{ secrets.TELEGRAM_BOT_TOKEN_PAPERS }}
+          TELEGRAM_CHAT_ID_PAPERS: ${{ secrets.TELEGRAM_CHAT_ID_PAPERS }}
+        run: python scripts/send_papers.py

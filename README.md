@@ -18,7 +18,7 @@ para compartir el mismo canal de envío: **oportunidades académicas**
 [Sistema de oportunidades académicas](#sistema-de-oportunidades-académicas)
 más abajo.
 
-## Estado actual: Partes A, B, C y D
+## Estado actual: Partes A–F completas
 
 **A — conexión con OpenAlex.** Conecta con la [API de OpenAlex](https://docs.openalex.org/)
 y trae papers del top 40 de revistas de economía (por impacto, `2yr_mean_citedness`),
@@ -46,11 +46,20 @@ en español y calibrada al contexto de la usuaria. La referencia completa (9) se
 arma con los metadatos de OpenAlex, no con lo que transcriba el modelo, para
 que la cita sea siempre exacta.
 
-El envío por Telegram (Parte E) ya está implementado y en uso por el
-pipeline de oportunidades (ver [más abajo](#envío-por-telegram-parte-e)) —
-falta conectarlo a este pipeline de papers, y agregar la Parte F
-(automatización vía GitHub Actions, análoga a la que ya corre para
-oportunidades).
+**E — envío por Telegram.** Manda la ficha (texto) y el PDF (documento
+adjunto) por un bot de Telegram **separado** del pipeline de oportunidades
+— son dos chats distintos que no se mezclan. Ver
+[Envío por Telegram](#envío-por-telegram-parte-e) más abajo para el detalle
+compartido, y la sección de variables de entorno de esta parte para el bot
+específico de papers.
+
+**F — automatización.** `.github/workflows/papers.yml` corre
+`scripts/send_papers.py` solo, **lunes, martes y jueves a las 7:00am hora
+Colombia** — horario distinto al del pipeline de oportunidades (lun/mié/vie
+8am), para que no lleguen los dos mensajes el mismo momento. Guarda en
+`data/papers_sent.json` (vía cache de Actions, igual que oportunidades) los
+`openalex_id` ya enviados, para no repetir el mismo paper si sigue siendo
+el "top pick" en una corrida futura.
 
 ### Estructura
 
@@ -64,11 +73,14 @@ src/pdf/
   client.py     # Consecución del PDF: OA → Unpaywall → repos conocidos → búsqueda web
 src/ficha/
   client.py     # Genera la ficha leyendo el PDF completo con la API de Claude
+src/papers/
+  store.py      # Evita reenviar un paper ya notificado en corridas previas
 scripts/
   fetch_test_papers.py         # Parte A: trae 5 papers de prueba y los imprime
   evaluate_relevance_test.py   # Parte B: trae papers recientes y los evalúa
   resolve_pdf_test.py          # Parte C: A + B, y descarga el PDF del top pick
-  generate_ficha_test.py       # Parte D: A + B + C, y genera + imprime la ficha final
+  generate_ficha_test.py       # Parte D: A + B + C, e imprime la ficha final (no envía)
+  send_papers.py               # Parte E+F: A→B→C→D y ENVÍA por Telegram (uso real)
   resolve_journals.py          # Utilidad para regenerar journals.py si cambia la lista de revistas
 ```
 
@@ -88,9 +100,14 @@ OPENALEX_MAILTO=tu@email.com ANTHROPIC_API_KEY=sk-ant-... \
 OPENALEX_MAILTO=tu@email.com ANTHROPIC_API_KEY=sk-ant-... \
     python scripts/resolve_pdf_test.py
 
-# Parte D (encadena A + B + C, e imprime la ficha final)
+# Parte D (encadena A + B + C, e imprime la ficha final, no envía nada)
 OPENALEX_MAILTO=tu@email.com ANTHROPIC_API_KEY=sk-ant-... \
     python scripts/generate_ficha_test.py
+
+# Parte E+F (encadena A→B→C→D y ENVÍA por Telegram - uso real)
+OPENALEX_MAILTO=tu@email.com ANTHROPIC_API_KEY=sk-ant-... \
+    TELEGRAM_BOT_TOKEN_PAPERS=123456789:ABC-... TELEGRAM_CHAT_ID_PAPERS=... \
+    python scripts/send_papers.py
 ```
 
 `OPENALEX_MAILTO` es obligatorio: OpenAlex pide un email de contacto para
@@ -141,13 +158,7 @@ qué revistas entran, o refrescar el ranking de impacto), correr
   para acortar campos específicos (ej. limitar "identificación" y
   "resultados" a 2-3 oraciones en vez de dejarlo abierto).
 
-### Próximos pasos (spec)
-
-- **E.** Conectar este pipeline al envío por Telegram — el módulo
-  (`src/telegram/`) ya existe y está en uso por el pipeline de
-  oportunidades (ver abajo); falta un script que encadene A→B→C→D→envío.
-- **F.** Automatización vía GitHub Actions, 2–3 veces por semana — análoga
-  a `.github/workflows/opportunities.yml`, pero para este pipeline.
+Con esto, el pipeline de papers ya cubre las 6 partes del spec (A–F).
 
 ---
 
@@ -256,10 +267,15 @@ mensaje que el sistema inicie sin que la usuaria haya escrito antes —
 desproporcionado para notificarse a una sola persona. Un bot de Telegram
 manda mensajes libremente desde el minuto uno, sin aprobación de nadie.
 
-**Setup (una sola vez, ~2 minutos):**
+**Papers y oportunidades usan bots (y chats) separados** — son notificaciones
+de naturaleza distinta y no deben mezclarse en la misma conversación. Repetir
+el setup de abajo dos veces, una por pipeline.
+
+**Setup (una sola vez por bot, ~2 minutos):**
 1. En Telegram, buscar **@BotFather** y mandarle `/newbot`. Seguir las
-   instrucciones (nombre + username del bot). Da un **token**, formato
-   `123456789:ABC-...`.
+   instrucciones (nombre + username del bot — usar nombres distintos para
+   cada pipeline, ej. "Mis papers" y "Mis oportunidades"). Da un **token**,
+   formato `123456789:ABC-...`.
 2. Buscar tu bot nuevo por el username que le pusiste y mandarle cualquier
    mensaje (ej. "hola") — un bot no puede escribirle primero a un chat que
    nunca le escribió.
@@ -267,58 +283,66 @@ manda mensajes libremente desde el minuto uno, sin aprobación de nadie.
    (con tu token) y copiar tu **chat_id** de `result[0].message.chat.id`.
 
 ```bash
-# Prueba de humo: manda un mensaje de texto suelto
+# Prueba de humo: manda un mensaje de texto suelto (sirve para cualquiera
+# de los dos bots, solo cambia que token/chat_id le pases)
 TELEGRAM_BOT_TOKEN=123456789:ABC-... TELEGRAM_CHAT_ID=... \
     python scripts/send_test_telegram.py
 ```
 
 ### Variables de entorno
 
-| Variable | Obligatoria | Descripción |
-|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | sí | Token del bot, dado por @BotFather (paso 1). |
-| `TELEGRAM_CHAT_ID` | sí | chat_id destino (paso 3). |
+| Variable | Pipeline | Obligatoria | Descripción |
+|---|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | oportunidades | sí | Token del bot de oportunidades, dado por @BotFather. |
+| `TELEGRAM_CHAT_ID` | oportunidades | sí | chat_id destino del bot de oportunidades. |
+| `TELEGRAM_BOT_TOKEN_PAPERS` | papers | sí | Token del bot de papers (otro `/newbot`, separado del de arriba). |
+| `TELEGRAM_CHAT_ID_PAPERS` | papers | sí | chat_id destino del bot de papers. |
 
-**Límite:** Telegram permite hasta 4096 caracteres por mensaje;
-`send_telegram_message` levanta `TelegramError` si lo supera (las fichas de
-oportunidades caben cómodamente dentro de ese límite; las de papers, ver
-nota de longitud en la sección de arriba, hay que vigilarlas).
+**Límite:** Telegram permite hasta 4096 caracteres por mensaje de texto (y
+1024 de caption en un documento); `send_telegram_message` /
+`send_telegram_document` levantan `TelegramError` si se supera (las fichas
+de oportunidades caben cómodamente; las de papers, ver nota de longitud en
+la sección de arriba, hay que vigilarlas). `send_papers.py` manda la ficha
+como mensaje de texto y el PDF por separado con `send_telegram_document`
+(sin caption, para no toparse con ese límite más chico).
 
 ---
 
 ## Automatización (Parte F)
 
-El pipeline de oportunidades corre solo, sin intervención manual, vía
-GitHub Actions: `.github/workflows/opportunities.yml` ejecuta
-`scripts/send_opportunities.py` **lunes, miércoles y viernes a las 8:00am
-hora Colombia**.
+Los dos pipelines corren solos, sin intervención manual, vía GitHub Actions
+— cada uno con su propio workflow, horario y secrets, para no pisarse:
 
-**Setup (una sola vez), en la página del repo en GitHub:**
-1. Completar el setup de Telegram de la sección anterior (bot + chat_id).
+| Workflow | Script | Horario (hora Colombia) |
+|---|---|---|
+| `.github/workflows/opportunities.yml` | `scripts/send_opportunities.py` | Lunes, miércoles y viernes 8:00am |
+| `.github/workflows/papers.yml` | `scripts/send_papers.py` | Lunes, martes y jueves 7:00am |
+
+**Setup (una sola vez por workflow), en la página del repo en GitHub:**
+1. Completar el setup de Telegram de la sección anterior (un bot por
+   pipeline — dos bots en total).
 2. Settings → Secrets and variables → Actions → New repository secret, y
-   agregar: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
-3. Mergear la rama con este workflow a la rama default del repo (`main`) —
+   agregar:
+   - Para oportunidades: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+   - Para papers: `ANTHROPIC_API_KEY` (se puede reusar el mismo secret),
+     `OPENALEX_MAILTO`, `TELEGRAM_BOT_TOKEN_PAPERS`, `TELEGRAM_CHAT_ID_PAPERS`.
+3. Mergear la rama con estos workflows a la rama default del repo (`main`) —
    los triggers de horario (`schedule`) de GitHub Actions **solo** se activan
    con la versión del workflow que está en la rama default, no en una rama
    feature. Sin este paso el cron queda inactivo aunque el archivo ya exista.
 
-**Para probarlo sin esperar al cron:** pestaña Actions del repo →
-"Oportunidades académicas por Telegram" → Run workflow (dispara el
-`workflow_dispatch`, que sí funciona desde cualquier rama que tenga el
-archivo).
+**Para probarlo sin esperar al cron:** pestaña Actions del repo → elegir
+"Oportunidades académicas por Telegram" o "Papers académicos por Telegram"
+→ Run workflow (dispara el `workflow_dispatch`, que sí funciona desde
+cualquier rama que tenga el archivo).
 
 **Cómo persiste el estado entre corridas:** cada corrida del workflow parte
 de un checkout limpio (no hay disco persistente en GitHub Actions), así que
-`data/opportunities_seen.json` se guarda/restaura con `actions/cache` en vez
-de comprometerlo al repo — evita tanto perder el historial de oportunidades
-ya enviadas como llenar el repo de commits automáticos.
+`data/opportunities_seen.json` y `data/papers_sent.json` se guardan/restauran
+con `actions/cache` en vez de comprometerlos al repo — evita tanto perder el
+historial de lo ya enviado como llenar el repo de commits automáticos.
 
 **Costo a tener en cuenta:** cada corrida hace llamados reales a la API de
-Claude (con `web_search`/`web_fetch`); Telegram en sí es gratis. El volumen
-de 3 corridas/semana es bajo, pero no deja de costar por el lado de Claude.
-
-### Pendiente
-
-- El pipeline de papers (Partes A–D, ya completas) no está conectado a
-  ningún workflow todavía — falta un job análogo a este mismo archivo (o uno
-  separado, `papers.yml`) que encadene A→B→C→D y envíe por `src/telegram/`.
+Claude (oportunidades con `web_search`/`web_fetch`; papers con `messages.create`
+sobre PDFs completos, más caro por corrida pero solo corre 3 veces/semana);
+Telegram en sí es gratis.

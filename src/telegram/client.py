@@ -79,3 +79,53 @@ def send_telegram_message(
         raise TelegramError(f"Error mandando el mensaje por Telegram: {data}")
 
     return data["result"]["message_id"]
+
+
+def send_telegram_document(
+    file_path: str,
+    caption: str | None = None,
+    chat_id: str | None = None,
+    bot_token: str | None = None,
+) -> int:
+    """Manda el archivo en `file_path` como documento por Telegram (usado por
+    el pipeline de papers para adjuntar el PDF completo). Devuelve el
+    message_id.
+
+    `caption` va como texto acompañando el documento (limite de Telegram:
+    1024 caracteres, mas corto que el de un mensaje de texto suelto) - para
+    la ficha completa, mandala primero con send_telegram_message y usa este
+    `caption` solo para algo breve, o dejalo en None.
+    """
+    bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        raise TelegramError(
+            "Falta el token del bot. Define TELEGRAM_BOT_TOKEN (lo da "
+            "@BotFather al crear el bot con /newbot)."
+        )
+    chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
+    if not chat_id:
+        raise TelegramError(
+            "Falta el chat_id destino. Define TELEGRAM_CHAT_ID (ver el "
+            "docstring de este modulo para como obtenerlo con getUpdates)."
+        )
+
+    data = {"chat_id": chat_id}
+    if caption:
+        data["caption"] = caption[:1024]
+
+    try:
+        with open(file_path, "rb") as f:
+            resp = requests.post(
+                f"{API_BASE}/bot{bot_token}/sendDocument",
+                data=data,
+                files={"document": f},
+                timeout=60,
+            )
+        result = resp.json()
+    except (requests.RequestException, OSError) as e:
+        raise TelegramError(f"Error mandando el documento por Telegram: {e}") from e
+
+    if not result.get("ok"):
+        raise TelegramError(f"Error mandando el documento por Telegram: {result}")
+
+    return result["result"]["message_id"]
