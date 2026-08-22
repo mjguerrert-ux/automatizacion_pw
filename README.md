@@ -1,8 +1,22 @@
 # Sistema de papers académicos por WhatsApp
 
-Pipeline que recibe automáticamente papers académicos relevantes por WhatsApp,
-con resumen estructurado en español y PDF adjunto. Ver el spec completo para
+Pipeline que recibe automáticamente papers académicos relevantes, con
+resumen estructurado en español y PDF adjunto. Ver el spec completo para
 el diseño de todas las partes (A–F).
+
+> **Nota sobre el canal de envío:** el nombre del proyecto dice "por
+> WhatsApp" (la idea original), pero el envío automático implementado
+> (Parte E, ver abajo) usa **Telegram** — WhatsApp exige verificación de
+> negocio en Meta y una plantilla pre-aprobada para cualquier mensaje
+> automático, incluso mandándote notificaciones a vos misma, lo cual es
+> desproporcionado para un sistema de notificación personal. Telegram
+> cumple el mismo objetivo (llega al celular, automático) sin esa fricción.
+
+Este repo también incluye un segundo pipeline, independiente pero pensado
+para compartir el mismo canal de envío: **oportunidades académicas**
+(fellowships pre-doctorales y posiciones de RA). Ver la sección
+[Sistema de oportunidades académicas](#sistema-de-oportunidades-académicas)
+más abajo.
 
 ## Estado actual: Partes A, B y C
 
@@ -25,7 +39,8 @@ paper y descarga esa URL. Cada candidato se valida como PDF real (no solo
 que responda 200) antes de darlo por bueno.
 
 Todavía **no** redacta la ficha final en español (Parte D) ni envía nada por
-WhatsApp (Parte E).
+Telegram (Parte E — ya implementado y en uso por el pipeline de
+oportunidades, ver abajo; falta conectarlo aquí).
 
 ### Estructura
 
@@ -105,5 +120,180 @@ qué revistas entran, o refrescar el ranking de impacto), correr
 ### Próximos pasos (spec)
 
 - **D.** Generación de la ficha estructurada en español con la API de Claude.
-- **E.** Envío por WhatsApp (Twilio o Meta Cloud API).
+- **E.** Envío por Telegram — ✅ implementado (`src/telegram/`, compartido
+  con el pipeline de oportunidades), pendiente conectarlo aquí una vez
+  existan C y D.
 - **F.** Automatización (cron / GitHub Actions), 2–3 veces por semana.
+
+---
+
+## Sistema de oportunidades académicas
+
+Pipeline paralelo al de papers: recibe automáticamente por Telegram
+fellowships pre-doctorales y posiciones de research assistant (RA) que
+encajen con los intereses de la usuaria, en la misma ficha fija de siempre.
+
+Cubre dos tracks, ambos en economía con foco en educación:
+
+- **Académico:** fellowship pre-doctoral o RA, en cualquier universidad,
+  con foco en profesores/labs que trabajan en educación en países de
+  middle income (ej. Uganda, Colombia) — ver el ejemplo de referencia abajo.
+- **Entidades multilaterales / gubernamentales de desarrollo:** research
+  analyst, research assistant, consultant de investigación, o programas de
+  young professionals (ej. WBG YPP, IADB YPP) en Banco Mundial, BID/IADB,
+  CAF, OCDE, UNESCO, UNICEF y organismos análogos, en el área de economía
+  de la educación.
+
+No existe un equivalente a OpenAlex para este tipo de oportunidades (no hay
+una base de datos única y estructurada de fellowships/RA), así que este
+pipeline usa la API de Claude con sus herramientas de búsqueda (`web_search`)
+y de lectura de páginas (`web_fetch`) en vez de un cliente a una API externa.
+
+### Estructura
+
+```
+src/opportunities/
+  discovery.py  # Parte A: busca candidatos en la web (web_search)
+  extract.py    # Parte B: verifica cada candidato (web_fetch) y arma la ficha
+  format.py     # Arma el mensaje con la ficha fija
+  store.py      # Evita reenviar una oportunidad ya notificada en corridas previas
+src/telegram/
+  client.py     # Parte E: envío por Telegram vía un bot personal (compartido con papers)
+scripts/
+  discover_test_opportunities.py  # Parte A: prueba solo el descubrimiento
+  run_opportunities_test.py       # Corrida de prueba: descubre + verifica + imprime la ficha (no envía)
+  send_opportunities.py           # Corrida real: descubre + verifica + ENVÍA por Telegram
+  send_test_telegram.py           # Prueba de humo del bot, compartida con el pipeline de papers
+```
+
+### Ficha (formato fijo del mensaje)
+
+1. 🎓 Posición — tipo y nombre exacto
+2. 🏛️ Institución — universidad y profesor/lab a cargo
+3. 📍 Foco temático
+4. 🌍 Países involucrados
+5. 💰 Salario/financiamiento
+6. 📅 Fecha límite (o "no especificada")
+7. ✅ Requisitos clave
+8. 🔗 Link para aplicar
+
+### Ejemplos de referencia
+
+No son un filtro literal — son el patrón a reconocer en otras
+universidades/labs/organismos.
+
+- **Académico:** Embedded Development Lab (Harvard Graduate School of
+  Education), bajo el profesor Vesall Nourani: fellowship pre-doctoral con
+  foco en formación docente en Uganda y en la evaluación del programa
+  educativo SAT de FUNDAEC en Colombia.
+- **Multilateral:** Research Analyst / Consultant en el equipo de
+  Educación del Banco Mundial (Education Global Practice) o del BID
+  (División de Educación), apoyando evaluaciones de impacto y análisis
+  cuantitativo de política educativa en países en desarrollo.
+
+### Uso
+
+```bash
+pip install -r requirements.txt
+
+# Solo descubrimiento (Parte A)
+ANTHROPIC_API_KEY=sk-ant-... python scripts/discover_test_opportunities.py
+
+# Corrida de prueba: descubre, verifica y solo IMPRIME los mensajes (no envía)
+ANTHROPIC_API_KEY=sk-ant-... python scripts/run_opportunities_test.py
+
+# Corrida real: descubre, verifica y ENVÍA por Telegram cada oportunidad nueva
+ANTHROPIC_API_KEY=sk-ant-... \
+    TELEGRAM_BOT_TOKEN=123456789:ABC-... TELEGRAM_CHAT_ID=... \
+    python scripts/send_opportunities.py
+```
+
+Cada corrida guarda en `data/opportunities_seen.json` (no versionado) los
+links ya notificados/enviados, para no repetir la misma oportunidad en la
+siguiente corrida mientras siga abierta. `send_opportunities.py` solo marca
+una oportunidad como vista después de que el envío por Telegram fue exitoso;
+si falla, se reintenta en la próxima corrida.
+
+### Limitaciones conocidas
+
+- La cobertura depende de qué tan bien indexadas estén las páginas de los
+  labs/profesores/organismos en los motores de búsqueda que usa `web_search`;
+  no hay garantía de encontrar el 100% de las convocatorias abiertas.
+
+---
+
+## Envío por Telegram (Parte E)
+
+Módulo compartido por ambos pipelines (`src/telegram/client.py`), vía la
+[API de bots de Telegram](https://core.telegram.org/bots/api#sendmessage).
+Se eligió Telegram en vez de WhatsApp Business porque WhatsApp exige
+verificación de negocio en Meta y una plantilla pre-aprobada para *cualquier*
+mensaje que el sistema inicie sin que la usuaria haya escrito antes —
+desproporcionado para notificarse a una sola persona. Un bot de Telegram
+manda mensajes libremente desde el minuto uno, sin aprobación de nadie.
+
+**Setup (una sola vez, ~2 minutos):**
+1. En Telegram, buscar **@BotFather** y mandarle `/newbot`. Seguir las
+   instrucciones (nombre + username del bot). Da un **token**, formato
+   `123456789:ABC-...`.
+2. Buscar tu bot nuevo por el username que le pusiste y mandarle cualquier
+   mensaje (ej. "hola") — un bot no puede escribirle primero a un chat que
+   nunca le escribió.
+3. Abrir en el navegador `https://api.telegram.org/bot<TOKEN>/getUpdates`
+   (con tu token) y copiar tu **chat_id** de `result[0].message.chat.id`.
+
+```bash
+# Prueba de humo: manda un mensaje de texto suelto
+TELEGRAM_BOT_TOKEN=123456789:ABC-... TELEGRAM_CHAT_ID=... \
+    python scripts/send_test_telegram.py
+```
+
+### Variables de entorno
+
+| Variable | Obligatoria | Descripción |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | sí | Token del bot, dado por @BotFather (paso 1). |
+| `TELEGRAM_CHAT_ID` | sí | chat_id destino (paso 3). |
+
+**Límite:** Telegram permite hasta 4096 caracteres por mensaje;
+`send_telegram_message` levanta `TelegramError` si lo supera (las fichas de
+oportunidades caben cómodamente dentro de ese límite).
+
+---
+
+## Automatización (Parte F)
+
+El pipeline de oportunidades corre solo, sin intervención manual, vía
+GitHub Actions: `.github/workflows/opportunities.yml` ejecuta
+`scripts/send_opportunities.py` **lunes, miércoles y viernes a las 8:00am
+hora Colombia**.
+
+**Setup (una sola vez), en la página del repo en GitHub:**
+1. Completar el setup de Telegram de la sección anterior (bot + chat_id).
+2. Settings → Secrets and variables → Actions → New repository secret, y
+   agregar: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+3. Mergear la rama con este workflow a la rama default del repo (`main`) —
+   los triggers de horario (`schedule`) de GitHub Actions **solo** se activan
+   con la versión del workflow que está en la rama default, no en una rama
+   feature. Sin este paso el cron queda inactivo aunque el archivo ya exista.
+
+**Para probarlo sin esperar al cron:** pestaña Actions del repo →
+"Oportunidades académicas por Telegram" → Run workflow (dispara el
+`workflow_dispatch`, que sí funciona desde cualquier rama que tenga el
+archivo).
+
+**Cómo persiste el estado entre corridas:** cada corrida del workflow parte
+de un checkout limpio (no hay disco persistente en GitHub Actions), así que
+`data/opportunities_seen.json` se guarda/restaura con `actions/cache` en vez
+de comprometerlo al repo — evita tanto perder el historial de oportunidades
+ya enviadas como llenar el repo de commits automáticos.
+
+**Costo a tener en cuenta:** cada corrida hace llamados reales a la API de
+Claude (con `web_search`/`web_fetch`); Telegram en sí es gratis. El volumen
+de 3 corridas/semana es bajo, pero no deja de costar por el lado de Claude.
+
+### Pendiente
+
+- El pipeline de papers (Partes C y D) no está conectado a ningún workflow
+  todavía — una vez existan, puede agregarse un job análogo a este mismo
+  archivo o uno separado (`papers.yml`) que use el mismo `src/telegram/`.
