@@ -181,13 +181,11 @@ siguiente corrida mientras siga abierta. `send_opportunities.py` solo marca
 una oportunidad como vista después de que el envío por WhatsApp fue exitoso;
 si Twilio falla, se reintenta en la próxima corrida.
 
-### Limitaciones conocidas / próximos pasos
+### Limitaciones conocidas
 
 - La cobertura depende de qué tan bien indexadas estén las páginas de los
   labs/profesores/organismos en los motores de búsqueda que usa `web_search`;
   no hay garantía de encontrar el 100% de las convocatorias abiertas.
-- Falta la Parte F: automatización (cron / GitHub Actions) para correr
-  `send_opportunities.py` 2–3 veces por semana sin intervención manual.
 
 ---
 
@@ -227,3 +225,42 @@ fichas de oportunidades caben cómodamente dentro de ese límite).
 Business propio, el sandbox de Twilio solo entrega mensajes a números que ya
 se unieron a él (paso 2 arriba) — sirve para desarrollo/pruebas personales,
 no para mandarle el pipeline a otra persona sin que también se una.
+
+---
+
+## Automatización (Parte F)
+
+El pipeline de oportunidades corre solo, sin intervención manual, vía
+GitHub Actions: `.github/workflows/opportunities.yml` ejecuta
+`scripts/send_opportunities.py` **lunes, miércoles y viernes a las 8:00am
+hora Colombia**.
+
+**Setup (una sola vez), en la página del repo en GitHub:**
+1. Settings → Secrets and variables → Actions → New repository secret, y
+   agregar: `ANTHROPIC_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+   `TWILIO_WHATSAPP_TO` (y `TWILIO_WHATSAPP_FROM` si no usas el sandbox).
+2. Mergear la rama con este workflow a la rama default del repo (`main`) —
+   los triggers de horario (`schedule`) de GitHub Actions **solo** se activan
+   con la versión del workflow que está en la rama default, no en una rama
+   feature. Sin este paso el cron queda inactivo aunque el archivo ya exista.
+
+**Para probarlo sin esperar al cron:** pestaña Actions del repo →
+"Oportunidades académicas por WhatsApp" → Run workflow (dispara el
+`workflow_dispatch`, que sí funciona desde cualquier rama que tenga el
+archivo).
+
+**Cómo persiste el estado entre corridas:** cada corrida del workflow parte
+de un checkout limpio (no hay disco persistente en GitHub Actions), así que
+`data/opportunities_seen.json` se guarda/restaura con `actions/cache` en vez
+de comprometerlo al repo — evita tanto perder el historial de oportunidades
+ya enviadas como llenar el repo de commits automáticos.
+
+**Costo a tener en cuenta:** cada corrida hace llamados reales a la API de
+Claude (con `web_search`/`web_fetch`) y, si hay oportunidades nuevas, a
+Twilio — no es gratis, aunque para 3 corridas/semana el volumen es bajo.
+
+### Pendiente
+
+- El pipeline de papers (Partes C y D) no está conectado a ningún workflow
+  todavía — una vez existan, puede agregarse un job análogo a este mismo
+  archivo o uno separado (`papers.yml`) que use el mismo `src/whatsapp/`.

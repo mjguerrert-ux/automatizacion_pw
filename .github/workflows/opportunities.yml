@@ -1,0 +1,56 @@
+name: Oportunidades académicas por WhatsApp
+
+# Parte F del pipeline de oportunidades: corre send_opportunities.py solo,
+# 3 veces por semana (lunes/miércoles/viernes), sin intervención manual.
+#
+# IMPORTANTE: los triggers de "schedule" solo se disparan desde la version
+# de este archivo que este en la rama default del repo (normalmente main) -
+# hay que mergear esta rama para que el cron quede activo. "workflow_dispatch"
+# si se puede correr manualmente desde cualquier rama que tenga este archivo,
+# util para probar antes de mergear.
+#
+# Requiere estos secrets del repo (Settings > Secrets and variables >
+# Actions > New repository secret):
+#   ANTHROPIC_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
+#   TWILIO_WHATSAPP_TO y, opcional, TWILIO_WHATSAPP_FROM.
+
+on:
+  schedule:
+    # 13:00 UTC = 8:00am hora Colombia (UTC-5), lunes/miercoles/viernes.
+    - cron: "0 13 * * 1,3,5"
+  workflow_dispatch: {}
+
+jobs:
+  send-opportunities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # data/opportunities_seen.json no esta versionado (es estado, no
+      # codigo) y cada corrida del workflow arranca desde un checkout
+      # limpio, asi que se persiste entre corridas con un cache: cada
+      # corrida guarda una entrada nueva (key con run_id, siempre unica) y
+      # restaura la mas reciente que matchee el prefijo restore-keys.
+      - name: Restaurar oportunidades ya vistas
+        uses: actions/cache@v4
+        with:
+          path: data/opportunities_seen.json
+          key: opportunities-seen-${{ github.run_id }}
+          restore-keys: |
+            opportunities-seen-
+
+      - name: Descubrir, verificar y enviar por WhatsApp
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_WHATSAPP_TO: ${{ secrets.TWILIO_WHATSAPP_TO }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+        run: python scripts/send_opportunities.py
