@@ -1,0 +1,59 @@
+name: Preguntas sobre papers por Telegram
+
+# Poll de preguntas de seguimiento sobre el ultimo paper enviado (Parte
+# D+E "conversacional"). Corre cada 5 minutos, revisa si la usuaria le
+# escribio algo nuevo al bot de papers y, si es asi, responde usando el PDF
+# del paper actual (guardado por send_papers.py en data/current_paper/).
+#
+# No es un servidor - es un poll periodico, asi que la respuesta puede
+# tardar hasta ~5 minutos (y a veces mas: GitHub no garantiza que un
+# "schedule" dispare exactamente a tiempo, sobre todo en horas pico de la
+# plataforma). Si mas adelante hace falta respuesta instantanea, hay que
+# mover esto a un webhook con un servicio siempre activo.
+#
+# Solo llama a la API de Claude cuando hay una pregunta nueva de verdad
+# (getUpdates es gratis) - correr esto cada 5 min no genera costo si nadie
+# pregunta nada.
+#
+# IMPORTANTE: igual que papers.yml, el "schedule" solo se activa desde la
+# version de este archivo que este en la rama default del repo (main).
+#
+# Requiere estos secrets (Settings > Secrets and variables > Actions):
+# ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN_PAPERS, TELEGRAM_CHAT_ID_PAPERS.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  answer-questions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # Mismo cache (prefijo "papers-state-") que papers.yml - necesita ver
+      # el mismo data/current_paper/ que escribio la ultima corrida de
+      # send_papers.py, y el offset de Telegram que dejo la ultima corrida
+      # de este mismo workflow.
+      - name: Restaurar estado de papers (enviados + paper actual + offset)
+        uses: actions/cache@v4
+        with:
+          path: data/
+          key: papers-state-${{ github.run_id }}
+          restore-keys: |
+            papers-state-
+
+      - name: Revisar preguntas nuevas y responder
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN_PAPERS: ${{ secrets.TELEGRAM_BOT_TOKEN_PAPERS }}
+          TELEGRAM_CHAT_ID_PAPERS: ${{ secrets.TELEGRAM_CHAT_ID_PAPERS }}
+        run: python scripts/answer_paper_questions.py

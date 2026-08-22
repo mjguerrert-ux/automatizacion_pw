@@ -32,6 +32,7 @@ from pathlib import Path
 import anthropic
 
 from openalex.client import Paper
+from telegram.client import escape_html
 
 DEFAULT_MODEL = "claude-opus-5"
 
@@ -284,11 +285,6 @@ def generate_ficha(
     return FichaContent(**data)
 
 
-def _escape_html(text: str) -> str:
-    """Telegram (parse_mode=HTML) solo reserva estos 3 caracteres - hay que
-    escaparlos en cualquier texto dinamico (titulo, autores, campos generados
-    por el modelo) antes de insertarlo en el mensaje con tags <b>."""
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _format_authors_for_reference(authors: list[str]) -> str:
@@ -355,15 +351,15 @@ def format_ficha_message(
     else:
         raise FichaError(f"Tipo de ficha desconocido: {ficha.tipo!r}")
 
-    parts = [f"📄 <b>{_escape_html(_format_titulo_autores(paper))}</b>"]
+    parts = [f"📄 <b>{escape_html(_format_titulo_autores(paper))}</b>"]
 
     if top_pick_reasoning:
-        parts.append(f"🏆 <b>Por qué esta semana</b>\n{_escape_html(top_pick_reasoning)}")
+        parts.append(f"🏆 <b>Por qué esta semana</b>\n{escape_html(top_pick_reasoning)}")
 
     for title, content in sections:
-        parts.append(f"<b>{title}</b>\n{_escape_html(content)}")
+        parts.append(f"<b>{title}</b>\n{escape_html(content)}")
 
-    parts.append(f"📖 <b>Referencia</b>\n{_escape_html(_format_reference(paper))}")
+    parts.append(f"📖 <b>Referencia</b>\n{escape_html(_format_reference(paper))}")
     parts.append("📎 PDF adjunto")
 
     return "\n\n".join(parts)

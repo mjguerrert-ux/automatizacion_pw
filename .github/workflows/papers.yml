@@ -35,17 +35,20 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      # data/papers_sent.json no esta versionado (es estado, no codigo) y
-      # cada corrida del workflow arranca desde un checkout limpio, asi que
-      # se persiste entre corridas con un cache - mismo patron que
-      # opportunities.yml.
-      - name: Restaurar papers ya enviados
+      # data/ no esta versionado (es estado, no codigo) y cada corrida del
+      # workflow arranca desde un checkout limpio, asi que se persiste entre
+      # corridas con un cache - mismo patron que opportunities.yml. Este
+      # cache (prefijo "papers-state-") lo comparten este workflow y
+      # papers_qa.yml: send_papers.py escribe papers_sent.json y
+      # current_paper/ (para las preguntas de seguimiento); ambos deben ver
+      # lo mismo, asi que usan la misma key.
+      - name: Restaurar estado de papers (enviados + paper actual)
         uses: actions/cache@v4
         with:
-          path: data/papers_sent.json
-          key: papers-sent-${{ github.run_id }}
+          path: data/
+          key: papers-state-${{ github.run_id }}
           restore-keys: |
-            papers-sent-
+            papers-state-
 
       - name: Filtrar, conseguir PDF, generar ficha y enviar por Telegram
         env:

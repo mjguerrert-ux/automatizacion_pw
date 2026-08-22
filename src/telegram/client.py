@@ -36,6 +36,15 @@ class TelegramError(RuntimeError):
     pass
 
 
+def escape_html(text: str) -> str:
+    """Telegram (parse_mode=HTML) solo reserva estos 3 caracteres - hay que
+    escaparlos en cualquier texto dinamico (generado por el modelo, o
+    metadatos como titulo/autores) antes de insertarlo en un mensaje que use
+    tags <b>/<i>/etc, para que un "&"/"<"/">" del contenido no rompa el
+    parseo del mensaje."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def send_telegram_message(
     text: str,
     chat_id: str | None = None,
@@ -142,3 +151,45 @@ def send_telegram_document(
         raise TelegramError(f"Error mandando el documento por Telegram: {result}")
 
     return result["result"]["message_id"]
+
+
+def get_updates(
+    bot_token: str | None = None,
+    offset: int | None = None,
+    timeout: int = 0,
+) -> list[dict]:
+    """Trae mensajes nuevos del bot (usado por el polling de preguntas sobre
+    papers). `offset` es el update_id a partir del cual traer (Telegram
+    interpreta cualquier update con id < offset como ya leido/confirmado del
+    lado del servidor) - guardar `ultimo_update_id + 1` entre corridas evita
+    reprocesar el mismo mensaje.
+
+    `timeout` es long-polling del lado de Telegram (segundos que el request
+    espera si no hay updates nuevos) - se deja en 0 (no bloqueante) porque
+    esto se llama desde un cron periodico, no un proceso siempre corriendo.
+    """
+    bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        raise TelegramError(
+            "Falta el token del bot. Define TELEGRAM_BOT_TOKEN (lo da "
+            "@BotFather al crear el bot con /newbot)."
+        )
+
+    params = {"timeout": timeout}
+    if offset is not None:
+        params["offset"] = offset
+
+    try:
+        resp = requests.get(
+            f"{API_BASE}/bot{bot_token}/getUpdates",
+            params=params,
+            timeout=timeout + 30,
+        )
+        data = resp.json()
+    except requests.RequestException as e:
+        raise TelegramError(f"Error de red consultando updates de Telegram: {e}") from e
+
+    if not data.get("ok"):
+        raise TelegramError(f"Error consultando updates de Telegram: {data}")
+
+    return data["result"]

@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from ficha.client import FichaError, format_ficha_message, generate_ficha  # noqa: E402
 from openalex.client import OpenAlexError, fetch_papers  # noqa: E402
 from openalex.journals import source_id_filter  # noqa: E402
+from papers.qa_state import save_current_paper  # noqa: E402
 from papers.store import load_sent, mark_sent  # noqa: E402
 from pdf.client import resolve_pdf  # noqa: E402
 from relevance.client import RelevanceError, evaluate_papers  # noqa: E402
@@ -95,6 +96,17 @@ def _send(mailto: str, bot_token: str, chat_id: str) -> None:
         sys.exit(f"Error mandando por Telegram: {e}")
 
     mark_sent([top.openalex_id])
+    save_current_paper(
+        {
+            "openalex_id": top.openalex_id,
+            "title": top.title,
+            "authors": top.authors,
+            "journal": top.journal,
+            "publication_year": top.publication_year,
+            "doi": top.doi,
+        },
+        pdf_result.local_path,
+    )
     print(f"\n=== Enviado: {top.title} ===")
 
 
