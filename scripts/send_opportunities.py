@@ -19,11 +19,23 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from opportunities.discovery import DEFAULT_MODEL as DEFAULT_DISCOVERY_MODEL  # noqa: E402
 from opportunities.discovery import DiscoveryError, discover_opportunities  # noqa: E402
+from opportunities.extract import DEFAULT_MODEL as DEFAULT_EXTRACT_MODEL  # noqa: E402
 from opportunities.extract import ExtractError, extract_fichas  # noqa: E402
 from opportunities.format import format_message  # noqa: E402
 from opportunities.store import load_seen, mark_seen  # noqa: E402
+from opportunities.usage import TokenUsage, estimate_cost_usd  # noqa: E402
 from telegram.client import TelegramError, send_telegram_message  # noqa: E402
+
+
+def _print_usage(label: str, model: str, usage: TokenUsage) -> None:
+    cost = estimate_cost_usd(model, usage)
+    cost_str = f"(~${cost:.3f} USD)" if cost is not None else "(no se pudo estimar el costo)"
+    print(
+        f"{label}: {usage.input_tokens:,} tokens entrada + {usage.output_tokens:,} salida, "
+        f"{usage.calls} llamada(s) a {model} {cost_str}"
+    )
 
 
 def main() -> None:
@@ -31,7 +43,10 @@ def main() -> None:
     try:
         discovery = discover_opportunities()
     except DiscoveryError as e:
+        _print_usage("Uso de tokens (descubrimiento, antes de fallar)", DEFAULT_DISCOVERY_MODEL, e.usage)
         sys.exit(f"Error en el descubrimiento: {e}")
+
+    _print_usage("Uso de tokens (descubrimiento)", discovery.model, discovery.usage)
 
     seen = load_seen()
     candidates = [c for c in discovery.candidates if c.source_url not in seen]
@@ -46,7 +61,10 @@ def main() -> None:
     try:
         result = extract_fichas(candidates)
     except ExtractError as e:
+        _print_usage("Uso de tokens (verificacion, antes de fallar)", DEFAULT_EXTRACT_MODEL, e.usage)
         sys.exit(f"Error en la verificacion: {e}")
+
+    _print_usage("Uso de tokens (verificacion)", result.model, result.usage)
 
     relevant = [ev for ev in result.evaluations if ev.is_relevant and ev.ficha]
     # Los no relevantes tambien se marcan como vistos, para no re-verificarlos.
@@ -76,6 +94,11 @@ def main() -> None:
         print(f"[OK] {c.title_raw} (message_id {message_id})")
 
     print(f"\n=== {n_sent}/{len(relevant)} oportunidades enviadas ===")
+
+    total_cost_discovery = estimate_cost_usd(discovery.model, discovery.usage)
+    total_cost_extract = estimate_cost_usd(result.model, result.usage)
+    if total_cost_discovery is not None and total_cost_extract is not None:
+        print(f"Costo total estimado de esta corrida: ~${total_cost_discovery + total_cost_extract:.3f} USD")
 
 
 if __name__ == "__main__":
