@@ -1,11 +1,11 @@
 """
 Corrida de punta a punta del pipeline de oportunidades (Partes A + B + ficha):
 descubre candidatos, verifica cada uno visitando su pagina, y muestra el
-mensaje de WhatsApp ya armado para las oportunidades relevantes. Marca como
-"vistas" las que se muestran, para no repetirlas en la siguiente corrida.
+mensaje ya armado para las oportunidades relevantes. Marca como "vistas" las
+que se muestran, para no repetirlas en la siguiente corrida.
 
-No manda nada por WhatsApp todavia (Parte E, pendiente, compartida con el
-pipeline de papers).
+No manda nada por Telegram todavia (Parte E - usar send_opportunities.py
+para eso).
 
 Uso:
     ANTHROPIC_API_KEY=sk-ant-... python scripts/run_opportunities_test.py
@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from opportunities.discovery import DiscoveryError, discover_opportunities  # noqa: E402
 from opportunities.extract import ExtractError, extract_fichas  # noqa: E402
-from opportunities.format import format_whatsapp_message  # noqa: E402
+from opportunities.format import format_message  # noqa: E402
 from opportunities.store import load_seen, mark_seen  # noqa: E402
 
 
@@ -53,7 +53,7 @@ def main() -> None:
         if ev.is_relevant and ev.ficha:
             n_relevant += 1
             new_links.append(ev.ficha.apply_link or c.source_url)
-            print(format_whatsapp_message(ev.ficha))
+            print(format_message(ev.ficha))
             print()
 
     mark_seen(new_links + [c.source_url for c in candidates])

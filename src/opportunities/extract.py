@@ -5,7 +5,7 @@ Toma los candidatos crudos de la Parte A (`opportunities.discovery`) y, para
 cada uno, visita la pagina fuente (server tool `web_fetch`) para confirmar
 que es una oportunidad real y vigente, decidir si encaja con los criterios
 de la usuaria, y extraer los 8 campos de la ficha fija que se manda por
-WhatsApp. No arma el mensaje de WhatsApp en si: eso es `opportunities.format`.
+Telegram. No arma el mensaje en si: eso es `opportunities.format`.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ puedes usar web_search para intentar encontrar la pagina correcta.
 Para cada candidato, evalua los criterios de arriba (is_relevant + \
 reasoning en espanol, indicando a cual track corresponde) y, si es \
 relevante, completa la ficha con estos 8 campos exactos, en espanol, \
-listos para mandar por WhatsApp:
+listos para mandar por Telegram:
 
 1. position: tipo y nombre exacto de la posicion.
 2. institution: la institucion (universidad u organismo) y el profesor/ \

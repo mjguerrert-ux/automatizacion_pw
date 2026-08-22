@@ -1,7 +1,7 @@
 """
-Store minimo para no reenviar por WhatsApp una oportunidad ya notificada en
-una corrida anterior. Sin esto, cada corrida automatica (Parte F, todavia no
-implementada) volveria a mandar las mismas fellowships que siguen abiertas.
+Store minimo para no reenviar por Telegram una oportunidad ya notificada en
+una corrida anterior. Sin esto, cada corrida automatica (Parte F) volveria a
+mandar las mismas fellowships que siguen abiertas.
 
 Guarda solo los apply_link ya notificados, en un JSON plano. No es una base
 de datos: para el volumen de este pipeline (unas pocas oportunidades por
