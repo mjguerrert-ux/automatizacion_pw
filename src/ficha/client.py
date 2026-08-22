@@ -9,13 +9,12 @@ decide cual aplica despues de leer el PDF completo (campo `tipo`).
 
 Plantilla A - aplicados:
 Titulo/autores, Pregunta, Contexto, Metodo, Identificacion, Efectos fijos y
-controles, Mecanismos economicos, Resultados, Datos y muestra, Para tu
-trabajo, Referencia, PDF adjunto.
+controles, Mecanismos economicos, Resultados, Datos y muestra, Referencia,
+PDF adjunto.
 
 Plantilla B - tecnicos/metodologicos:
 Titulo/autores, Pregunta, El problema, El argumento, Ilustracion empirica,
-Que cambia en la practica, Que usar en su lugar, Para tu trabajo, Referencia,
-PDF adjunto.
+Que cambia en la practica, Que usar en su lugar, Referencia, PDF adjunto.
 
 Titulo/autores y Referencia se arman con los metadatos de OpenAlex (Parte A),
 no con lo que transcriba el modelo - la cita siempre es exacta. El resto de
@@ -85,57 +84,51 @@ recolectaron los datos o se dio el fenomeno estudiado, no el anio de publicacion
 - metodo (12 palabras maximo, etiqueta corta - NO una oracion completa): ej. \
 "DiD con Callaway-Sant'Anna", "RD con discontinuidad en edad", "VI con shock de \
 oferta".
-- identificacion (50 palabras maximo): cual es el shock y cuales son las \
+- identificacion (65 palabras maximo): cual es el shock y cuales son las \
 reglas de juego institucionales que generan la variacion que el paper explota. \
 Explica COMO funciona la estrategia de identificacion en terminos generales - \
-NO derives formulas, NO description paso a paso de un test estadistico.
-- efectos_fijos_controles (40 palabras maximo): que efectos fijos/controles usa \
+NO derives formulas, NO description paso a paso de un test estadistico. Usa \
+el espacio extra para que quede clara la logica, no para meter mas detalle \
+tecnico incidental.
+- efectos_fijos_controles (50 palabras maximo): que efectos fijos/controles usa \
 el paper y que interpretacion tienen - que fuente de confusion especifica \
 descartan (no listes los nombres de las variables sin mas: interpreta que \
 comparacion queda "limpia" gracias a cada uno). Si el paper no usa un panel \
 con efectos fijos (ej. es un experimento o una RD simple), decilo brevemente \
 en vez de forzar el campo.
-- mecanismos (30 palabras maximo): la teoria economica de por que deberia \
+- mecanismos (45 palabras maximo): la teoria economica de por que deberia \
 pasar lo que el paper predice o encuentra - el "por que" normativo/teorico, NO \
-el "como" tecnico (eso ya esta en identificacion).
-- resultados (55 palabras maximo): el hallazgo principal, con la magnitud del \
+el "como" tecnico (eso ya esta en identificacion). Desarrolla la logica \
+economica en vez de solo nombrarla (ej. no digas solo "seleccion", explica que \
+tipo de seleccion y por que opera en este contexto).
+- resultados (60 palabras maximo): el hallazgo principal, con la magnitud del \
 efecto en unidades interpretables (puntos porcentuales, desviaciones estandar, \
 pesos, anios de escolaridad, etc.) - nunca solo "el efecto es significativo". \
 Si hay muchas especificaciones alternativas, da SOLO el rango, sin nombrar cada \
 una.
 - datos_muestra (18 palabras maximo): fuente de los datos y tamanio de la \
 muestra.
-- para_tu_trabajo (35 palabras maximo): conexion CONCRETA y especifica con el \
-trabajo activo de la usuaria si el paper aplica - no te limites a nombrar el \
-programa (PAE, PEEP, desercion, salud mental, anticoncepcion de emergencia, \
-capital humano), di especificamente que deberia revisar o tener en cuenta en \
-SU analisis por este paper. Si nada del paper conecta con su trabajo, comenta \
-en cambio robustez o limites del estudio. No inventes conexiones ni \
-limitaciones solo por llenar el campo.
 
 ## Si tipo = "tecnico"
 
 - pregunta (20 palabras maximo): el problema metodologico que ataca el paper - \
 NO lo redactes como si fuera una pregunta de politica publica.
-- el_problema (40 palabras maximo): que falla en la practica estandar actual - \
+- el_problema (50 palabras maximo): que falla en la practica estandar actual - \
 por que el enfoque que todo el mundo usa hoy puede estar mal, y en que \
 situacion especificamente.
-- el_argumento (50 palabras maximo): el resultado tecnico central del paper, \
+- el_argumento (70 palabras maximo): el resultado tecnico central del paper, \
 explicado en palabras (no en notacion) - que muestra el paper y por que eso \
-es cierto, a alto nivel.
+es cierto, a alto nivel. Este es el corazon de la ficha: usa el espacio para \
+que la logica quede realmente clara, no solo nombrada.
 - ilustracion_empirica (30 palabras maximo): el caso empirico que usan para \
 mostrar el problema/argumento - es secundario, mencionalo brevemente (que \
 pregunta sustantiva usan de ejemplo, no como si fuera el foco del paper).
-- que_cambia_en_la_practica (45 palabras maximo): numeros concretos de la \
+- que_cambia_en_la_practica (50 palabras maximo): numeros concretos de la \
 correccion - cuanto cambia una estimacion tipica al aplicar lo que propone el \
 paper, en la ilustracion empirica u otro ejemplo que de el paper.
 - que_usar_en_su_lugar (25 palabras maximo): el estimador, test o comando \
 concreto que el paper recomienda usar en vez de la practica estandar (si el \
 paper es puramente diagnostico y no prescribe una alternativa, decilo).
-- para_tu_trabajo (35 palabras maximo): que deberia revisar o cambiar la \
-usuaria en SU trabajo (SIMAT, SABER 11, PAE, PEEP, desercion, salud mental, \
-capital humano, etc.) a partir de este resultado tecnico - concreto y \
-accionable, no una mencion generica del nombre del programa.
 
 Escribe para un mensaje de chat: directo, sin relleno, sin frases como "en \
 este paper los autores...". Ve al grano.\
@@ -153,7 +146,6 @@ _APLICADO_SCHEMA = {
         "mecanismos": {"type": "string"},
         "resultados": {"type": "string"},
         "datos_muestra": {"type": "string"},
-        "para_tu_trabajo": {"type": "string"},
     },
     "required": [
         "tipo",
@@ -165,7 +157,6 @@ _APLICADO_SCHEMA = {
         "mecanismos",
         "resultados",
         "datos_muestra",
-        "para_tu_trabajo",
     ],
     "additionalProperties": False,
 }
@@ -180,7 +171,6 @@ _TECNICO_SCHEMA = {
         "ilustracion_empirica": {"type": "string"},
         "que_cambia_en_la_practica": {"type": "string"},
         "que_usar_en_su_lugar": {"type": "string"},
-        "para_tu_trabajo": {"type": "string"},
     },
     "required": [
         "tipo",
@@ -190,7 +180,6 @@ _TECNICO_SCHEMA = {
         "ilustracion_empirica",
         "que_cambia_en_la_practica",
         "que_usar_en_su_lugar",
-        "para_tu_trabajo",
     ],
     "additionalProperties": False,
 }
@@ -206,7 +195,6 @@ class FichaError(RuntimeError):
 class FichaContent:
     tipo: str  # "aplicado" | "tecnico"
     pregunta: str
-    para_tu_trabajo: str
     # Plantilla A (aplicado)
     contexto: str | None = None
     metodo: str | None = None
@@ -336,7 +324,6 @@ def format_ficha_message(
             ("💡 Mecanismos económicos", ficha.mecanismos),
             ("📊 Resultados", ficha.resultados),
             ("📚 Datos y muestra", ficha.datos_muestra),
-            ("📝 Para tu trabajo", ficha.para_tu_trabajo),
         ]
     elif ficha.tipo == "tecnico":
         sections = [
@@ -346,7 +333,6 @@ def format_ficha_message(
             ("🖼️ Ilustración empírica", ficha.ilustracion_empirica),
             ("📊 Qué cambia en la práctica", ficha.que_cambia_en_la_practica),
             ("🛠️ Qué usar en su lugar", ficha.que_usar_en_su_lugar),
-            ("📝 Para tu trabajo", ficha.para_tu_trabajo),
         ]
     else:
         raise FichaError(f"Tipo de ficha desconocido: {ficha.tipo!r}")

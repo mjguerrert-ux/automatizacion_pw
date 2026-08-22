@@ -47,32 +47,45 @@ que a uno puramente metodológico:
 
 - **Aplicado** (responde una pregunta sustantiva con un método): Pregunta,
   Contexto, Método, Identificación, Efectos fijos y controles (interpretados,
-  no solo listados), Mecanismos económicos, Resultados, Datos y muestra, Para
-  tu trabajo.
+  no solo listados), Mecanismos económicos, Resultados, Datos y muestra.
 - **Técnico/metodológico** (propone o diagnostica un estimador en sí mismo):
   Pregunta, El problema, El argumento, Ilustración empírica (breve,
-  secundaria), Qué cambia en la práctica, Qué usar en su lugar, Para tu
-  trabajo.
+  secundaria), Qué cambia en la práctica, Qué usar en su lugar.
 
 Título/autores y Referencia se arman con los metadatos de OpenAlex, no con lo
-que transcriba el modelo, para que la cita sea siempre exacta.
+que transcriba el modelo, para que la cita sea siempre exacta. No hay un
+campo de "para tu trabajo": ese espacio se le dio a los campos conceptuales
+(identificación, mecanismos, el argumento) para que expliquen mejor la idea
+central, en vez de gastar palabras conectando con proyectos activos de la
+usuaria — eso ahora se resuelve preguntando directamente (ver Parte E).
 
-**E — envío por Telegram.** Manda la ficha (texto, con `parse_mode="HTML"`
-para que la negrita se vea de verdad — Telegram no renderiza formato si no
-se lo pedís explícitamente) y el PDF (documento adjunto) por un bot de
-Telegram **separado** del pipeline de oportunidades — son dos chats
-distintos que no se mezclan. Ver
-[Envío por Telegram](#envío-por-telegram-parte-e) más abajo para el detalle
-compartido, y la sección de variables de entorno de esta parte para el bot
-específico de papers.
+**E — envío por Telegram + preguntas de seguimiento.** Manda la ficha
+(texto, con `parse_mode="HTML"` para que la negrita se vea de verdad —
+Telegram no renderiza formato si no se lo pedís explícitamente) y el PDF
+(documento adjunto) por un bot de Telegram **separado** del pipeline de
+oportunidades — son dos chats distintos que no se mezclan.
+
+Además, la usuaria puede escribirle preguntas puntuales al bot sobre el
+**último paper enviado** y recibe una respuesta generada releyendo el PDF
+completo (sin memoria conversacional entre preguntas distintas, por ahora).
+Como no hay un servidor escuchando en tiempo real, esto funciona por
+*polling*: justo después de mandar un paper, `send_papers.py` revisa cada
+10 segundos por 10 minutos (la mayoría de las preguntas llegan poco después
+de la notificación); pasada esa ventana, un workflow aparte
+(`papers_qa.yml`, cada 5 minutos) sigue cubriendo el resto del día/semana.
+Ver [Envío por Telegram](#envío-por-telegram-parte-e) más abajo para el
+detalle compartido con oportunidades, y la sección de variables de entorno
+para el bot específico de papers.
 
 **F — automatización.** `.github/workflows/papers.yml` corre
 `scripts/send_papers.py` solo, **lunes, martes y jueves a las 7:00am hora
 Colombia** — horario distinto al del pipeline de oportunidades (lun/mié/vie
-8am), para que no lleguen los dos mensajes el mismo momento. Guarda en
-`data/papers_sent.json` (vía cache de Actions, igual que oportunidades) los
-`openalex_id` ya enviados, para no repetir el mismo paper si sigue siendo
-el "top pick" en una corrida futura.
+8am), para que no lleguen los dos mensajes el mismo momento (ese job queda
+corriendo ~10 minutos extra al final, por la ráfaga de preguntas descrita
+arriba). Guarda en `data/` (vía cache de Actions, igual que oportunidades)
+los `openalex_id` ya enviados y el paper "actual" para las preguntas de
+seguimiento, para no repetir el mismo paper si sigue siendo el "top pick"
+en una corrida futura.
 
 ### Estructura
 
@@ -88,12 +101,16 @@ src/ficha/
   client.py     # Genera la ficha leyendo el PDF completo con la API de Claude
 src/papers/
   store.py      # Evita reenviar un paper ya notificado en corridas previas
+  qa_state.py   # Estado del "paper actual" (para las preguntas) y el offset de Telegram
+  qa.py         # Responde una pregunta puntual releyendo el PDF del paper actual
+  qa_poll.py    # Logica compartida de "revisar y responder" (rafaga y poll de fondo)
 scripts/
   fetch_test_papers.py         # Parte A: trae 5 papers de prueba y los imprime
   evaluate_relevance_test.py   # Parte B: trae papers recientes y los evalúa
   resolve_pdf_test.py          # Parte C: A + B, y descarga el PDF del top pick
   generate_ficha_test.py       # Parte D: A + B + C, e imprime la ficha final (no envía)
-  send_papers.py               # Parte E+F: A→B→C→D y ENVÍA por Telegram (uso real)
+  send_papers.py               # Parte E+F: A→B→C→D, ENVÍA por Telegram y hace la ráfaga de preguntas
+  answer_paper_questions.py    # Poll de fondo (cada 5 min) de preguntas de seguimiento
   resolve_journals.py          # Utilidad para regenerar journals.py si cambia la lista de revistas
 ```
 

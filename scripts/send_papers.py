@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from ficha.client import FichaError, format_ficha_message, generate_ficha  # noqa: E402
 from openalex.client import OpenAlexError, fetch_papers  # noqa: E402
 from openalex.journals import source_id_filter  # noqa: E402
+from papers.qa_poll import poll_burst  # noqa: E402
 from papers.qa_state import save_current_paper  # noqa: E402
 from papers.store import load_sent, mark_sent  # noqa: E402
 from pdf.client import resolve_pdf  # noqa: E402
@@ -108,6 +109,11 @@ def _send(mailto: str, bot_token: str, chat_id: str) -> None:
         pdf_result.local_path,
     )
     print(f"\n=== Enviado: {top.title} ===")
+
+    print("\nRafaga de preguntas: revisando cada 10s por 10 min (la mayoria de las")
+    print("preguntas llegan poco despues de la notificacion)...")
+    poll_burst(bot_token, chat_id)
+    print("Rafaga terminada. El poll de fondo (cada 5 min) sigue cubriendo el resto del dia.")
 
 
 def main() -> None:

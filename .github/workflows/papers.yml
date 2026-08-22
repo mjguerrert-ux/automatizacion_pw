@@ -4,6 +4,11 @@ name: Papers académicos por Telegram
 # semana (lunes/martes/jueves), sin intervención manual. Usa un bot de
 # Telegram separado del de oportunidades (chats distintos).
 #
+# Después de enviar el paper, send_papers.py hace una ráfaga de polling
+# (cada 10s, hasta 10 min) por si la usuaria pregunta algo enseguida — el
+# job queda corriendo esos ~10 min extra antes de terminar. Después de esa
+# ventana, papers_qa.yml (cron cada 5 min) sigue cubriendo el resto del día.
+#
 # IMPORTANTE: los triggers de "schedule" solo se disparan desde la version
 # de este archivo que este en la rama default del repo (normalmente main) -
 # hay que mergear esta rama para que el cron quede activo. "workflow_dispatch"
