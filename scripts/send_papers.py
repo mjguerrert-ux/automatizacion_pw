@@ -3,6 +3,12 @@ Corrida real del pipeline de papers: trae candidatos (A), filtra por
 relevancia + importancia (B), consigue el PDF del top pick (C), genera la
 ficha (D) y la MANDA por Telegram — texto de la ficha + el PDF adjunto.
 
+Si no se consigue un PDF descargable del top pick (C falla), se lo descarta
+y se vuelve a evaluar (B) con el resto de candidatos, hasta encontrar uno
+con PDF disponible o agotar la lista — así una corrida no se pierde solo
+porque el mejor candidato esté detras de un bloqueo anti-bot o no tenga
+version de acceso abierto.
+
 Usa un bot de Telegram separado del pipeline de oportunidades (variables
 TELEGRAM_BOT_TOKEN_PAPERS / TELEGRAM_CHAT_ID_PAPERS), porque son dos chats
 distintos que no deben mezclarse.
@@ -61,26 +67,41 @@ def _send(mailto: str, bot_token: str, chat_id: str) -> None:
         return
 
     print(f"\nPaso 2/4: evaluando relevancia + importancia de {len(candidates)} candidatos...")
-    try:
-        assessment = evaluate_papers(candidates)
-    except RelevanceError as e:
-        sys.exit(f"Error evaluando relevancia: {e}")
+    top = None
+    pdf_result = None
+    top_pick_reasoning = None
+    remaining = candidates
+    while remaining:
+        try:
+            assessment = evaluate_papers(remaining)
+        except RelevanceError as e:
+            sys.exit(f"Error evaluando relevancia: {e}")
 
-    if assessment.top_pick_index is None:
-        print("Ningun candidato fue suficientemente relevante/importante en esta corrida.")
-        return
+        if assessment.top_pick_index is None:
+            print("Ningun candidato fue suficientemente relevante/importante en esta corrida.")
+            return
 
-    top = candidates[assessment.top_pick_index]
-    print(f"Top pick: {top.title}")
-    print(f"Razon: {assessment.top_pick_reasoning}\n")
+        candidate_top = remaining[assessment.top_pick_index]
+        print(f"Top pick: {candidate_top.title}")
+        print(f"Razon: {assessment.top_pick_reasoning}\n")
 
-    print("Paso 3/4: consiguiendo el PDF...")
-    pdf_result = resolve_pdf(top, out_dir=OUT_DIR, unpaywall_email=mailto)
-    if not pdf_result.local_path:
-        sys.exit(
-            f"No se pudo descargar el PDF ({pdf_result.notes}); "
-            "no se puede generar la ficha ni enviar."
+        print("Paso 3/4: consiguiendo el PDF...")
+        candidate_pdf = resolve_pdf(candidate_top, out_dir=OUT_DIR, unpaywall_email=mailto)
+        if candidate_pdf.local_path:
+            top = candidate_top
+            pdf_result = candidate_pdf
+            top_pick_reasoning = assessment.top_pick_reasoning
+            break
+
+        print(
+            f"No se pudo descargar el PDF ({candidate_pdf.notes}); "
+            "se descarta y se prueba con el siguiente mejor candidato...\n"
         )
+        remaining = [p for p in remaining if p.openalex_id != candidate_top.openalex_id]
+
+    if top is None:
+        sys.exit("No se pudo conseguir el PDF de ningun candidato relevante en esta corrida.")
+
     print(f"Fuente: {pdf_result.source} | archivo: {pdf_result.local_path}\n")
 
     print("Paso 4/4: generando la ficha y enviando por Telegram...")
@@ -89,7 +110,7 @@ def _send(mailto: str, bot_token: str, chat_id: str) -> None:
     except FichaError as e:
         sys.exit(f"Error generando la ficha: {e}")
 
-    messages = format_ficha_message(ficha, top, top_pick_reasoning=assessment.top_pick_reasoning)
+    messages = format_ficha_message(ficha, top, top_pick_reasoning=top_pick_reasoning)
     try:
         for part in messages:
             send_telegram_message(part, chat_id=chat_id, bot_token=bot_token, parse_mode="HTML")
