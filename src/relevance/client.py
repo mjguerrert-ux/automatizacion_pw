@@ -71,9 +71,11 @@ importante en inferencia causal.
 4. reasoning: una razon breve, en espanol.
 
 Al final, identifica el mejor candidato para enviar en esta corrida (top_pick_index, \
-el indice del paper) segun la regla de seleccion, con top_pick_reasoning explicando \
-por que, en espanol. Si ningun paper es suficientemente relevante o importante, \
-top_pick_index puede ser null.\
+el indice del paper) segun la regla de seleccion. top_pick_reasoning explica por que, \
+en espanol, en MAXIMO 2 oraciones (esto se le muestra directo a la usuaria como el \
+"por que te lo mando esta semana" al inicio del mensaje, asi que tiene que ser corto \
+y concreto, no un resumen del paper - eso ya esta en la ficha). Si ningun paper es \
+suficientemente relevante o importante, top_pick_index puede ser null.\
 """
 
 _EVALUATION_SCHEMA = {

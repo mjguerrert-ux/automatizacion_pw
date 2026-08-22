@@ -78,7 +78,7 @@ def main() -> None:
         sys.exit(f"Error generando la ficha: {e}")
 
     print("\n" + "=" * 60)
-    print(format_ficha_message(ficha, top))
+    print(format_ficha_message(ficha, top, top_pick_reasoning=assessment.top_pick_reasoning))
     print("=" * 60)
 
 

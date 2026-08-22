@@ -150,13 +150,15 @@ qué revistas entran, o refrescar el ranking de impacto), correr
   Cuando pasa, `resolve_pdf` sigue probando el resto de la cascada de fuentes;
   si ninguna funciona, devuelve la URL encontrada igual (para referencia)
   pero sin archivo descargado.
-- La ficha que genera la Parte D es técnicamente muy precisa (magnitudes
-  exactas, mecanismo de sesgo, conexión con proyectos activos de la usuaria),
-  pero cada campo puede salir bastante largo para un mensaje de chat —
-  sobre todo en papers metodológicos densos. Si en la práctica resulta
-  demasiado largo, hay que ajustar `SYSTEM_PROMPT` en `src/ficha/client.py`
-  para acortar campos específicos (ej. limitar "identificación" y
-  "resultados" a 2-3 oraciones en vez de dejarlo abierto).
+- El `SYSTEM_PROMPT` de la Parte D pone un techo duro de **palabras** (no de
+  oraciones) por campo — un límite por oraciones no funciona: el modelo lo
+  cumple igual escribiendo una sola oración larguísima con comas y guiones,
+  sin bajar el largo real del mensaje. Con un paper metodológico denso
+  (Goodman-Bacon 2021), el mensaje final quedó en ~2200 caracteres (54% del
+  límite de Telegram) — antes del ajuste llegaba a 3900+ (96%), sin margen
+  para papers con más autores o notas más largas. Si en la práctica se
+  vuelve a acercar al límite, hay que bajar los topes de palabras en
+  `src/ficha/client.py`, no volver a un límite por oraciones.
 
 Con esto, el pipeline de papers ya cubre las 6 partes del spec (A–F).
 

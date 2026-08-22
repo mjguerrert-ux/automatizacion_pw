@@ -87,7 +87,7 @@ def _send(mailto: str, bot_token: str, chat_id: str) -> None:
     except FichaError as e:
         sys.exit(f"Error generando la ficha: {e}")
 
-    message = format_ficha_message(ficha, top)
+    message = format_ficha_message(ficha, top, top_pick_reasoning=assessment.top_pick_reasoning)
     try:
         send_telegram_message(message, chat_id=chat_id, bot_token=bot_token)
         send_telegram_document(pdf_result.local_path, chat_id=chat_id, bot_token=bot_token)

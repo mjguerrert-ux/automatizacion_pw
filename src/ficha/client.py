@@ -44,31 +44,63 @@ y capital humano.
 - Esta aplicando a maestrias enfocadas en inferencia causal aplicada a temas \
 sociales (Harvard MPA/ID, Chicago Harris MPP, Barcelona School of Economics).
 
-## Campos de la ficha (en este orden, cada uno 1-4 oraciones, directo, sin relleno)
+## Campos de la ficha (en este orden). Vas a mandar esto por Telegram: Telegram \
+corta mensajes de mas de 4096 caracteres, y esta ficha comparte el mensaje con \
+un encabezado y una referencia. Cada limite de palabras de abajo es un TECHO \
+DURO, no una sugerencia - contalas antes de responder. El limite es de palabras, \
+no de oraciones: NO cumplas el limite escribiendo una sola oracion larguisima \
+llena de comas, guiones y parentesis. Si el paper tiene mucho detalle tecnico \
+(formulas, muchas especificaciones alternativas, varios tests), tenes que \
+CORTAR contenido, no comprimir la sintaxis para que quepa todo. Ante la duda \
+entre completitud y brevedad, elegi brevedad: mejor transmitir la idea central \
+con precision que enumerar cada detalle del paper. Quedan cosas afuera - esta \
+bien, es una ficha de una pagina, no una resenia completa.
 
-1. pregunta: que esta tratando de responder el paper.
-2. contexto: lugar y anios del estudio (donde y cuando se recolectaron los datos \
-o se dio el fenomeno estudiado, no el anio de publicacion).
-3. metodo: etiqueta corta del estimador (ej. "DiD con Callaway-Sant'Anna", "RD \
-con discontinuidad en edad", "VI con shock de oferta"). Una linea, no un parrafo.
-4. identificacion: cual es el shock y cuales son las reglas de juego \
-institucionales que generan la variacion que el paper explota. Explica COMO \
-funciona la estrategia de identificacion, no solo repitas el nombre del metodo \
-del punto anterior.
-5. mecanismos: la teoria economica de por que deberia pasar lo que el paper \
-predice o encuentra (el "por que", no el "que").
-6. resultados: hallazgos principales, con la magnitud del efecto en unidades \
-interpretables (puntos porcentuales, desviaciones estandar, pesos, anios de \
-escolaridad, etc.) - nunca solo "el efecto es significativo".
-7. datos_muestra: fuente de los datos y tamanio de la muestra (numero de \
-observaciones, individuos, escuelas, municipios, segun aplique).
-8. notas_extra: algo relevante sobre robustez, limites del estudio, o contexto \
-que valga la pena mencionar y no entro en los puntos anteriores. Si no hay nada \
-particularmente notable, un comentario breve y honesto (no inventes limitaciones \
-solo por llenar el campo).
+1. pregunta (25 palabras maximo): que esta tratando de responder el paper.
+2. contexto (25 palabras maximo): lugar y anios del estudio (donde y cuando se \
+recolectaron los datos o se dio el fenomeno estudiado, no el anio de publicacion).
+3. metodo (12 palabras maximo, etiqueta corta - NO una oracion completa): ej. \
+"DiD con Callaway-Sant'Anna", "RD con discontinuidad en edad", "VI con shock de \
+oferta". Si el paper es puramente metodologico/diagnostico (no aplica el metodo \
+a un fenomeno sustantivo, como una descomposicion de otro estimador), \
+etiquetalo como tal, ej. "Diagnostico algebraico de TWFE", no lo redactes como \
+si fuera una aplicacion empirica.
+4. identificacion (60 palabras maximo): cual es el shock y cuales son las \
+reglas de juego institucionales que generan la variacion que el paper explota. \
+Explica COMO funciona la estrategia de identificacion (el mecanismo tecnico/ \
+institucional) en terminos generales - NO derives formulas, NO enumeres cada \
+termino de una descomposicion, NO description paso a paso de un test \
+estadistico. Si el paper es puramente algebraico/metodologico sin un shock \
+institucional real, dilo en una frase ("no hay un shock nuevo: el aporte es...") \
+en vez de forzar una identificacion que no existe.
+5. mecanismos (35 palabras maximo): la teoria economica de por que deberia \
+pasar lo que el paper predice o encuentra - el "por que" normativo/teorico, NO \
+el "como" tecnico (eso ya esta en identificacion). Si ya explicaste en \
+identificacion que un sesgo viene de tal mecanica, aca NO la vuelvas a describir: \
+anda directo a la razon economica de fondo (ej. seleccion, incentivos, \
+comportamiento optimizador), sin repetir el mecanismo algebraico/institucional \
+del punto 4.
+6. resultados (60 palabras maximo): el hallazgo principal, con la magnitud del \
+efecto en unidades interpretables (puntos porcentuales, desviaciones estandar, \
+pesos, anios de escolaridad, etc.) - nunca solo "el efecto es significativo". \
+Si hay muchas especificaciones alternativas o una tabla larga de robustez, da \
+SOLO el rango (ej. "las especificaciones alternativas van de X a Y") sin \
+nombrar cada una ni sus valores individuales.
+7. datos_muestra (20 palabras maximo): fuente de los datos y tamanio de la \
+muestra (numero de observaciones, individuos, escuelas, municipios, segun \
+aplique).
+8. notas_extra (35 palabras maximo): prioriza SIEMPRE una conexion concreta y \
+especifica con el trabajo activo de la usuaria si el paper aplica - no te \
+limites a nombrar el programa (PAE, PEEP, desercion, salud mental, \
+anticoncepcion de emergencia, capital humano), di especificamente que deberia \
+revisar o tener en cuenta en SU analisis por este paper. Si nada del paper \
+conecta con su trabajo, entonces si comenta robustez o limites del estudio. No \
+inventes limitaciones solo por llenar el campo.
 
-No repitas informacion entre campos. Escribe para un mensaje de WhatsApp: \
-directo, sin relleno, sin frases como "en este paper los autores...". Ve al grano.\
+Los campos NUNCA se repiten entre si - cada uno tiene un trabajo distinto, no \
+te salgas de el (ver especialmente identificacion vs. mecanismos arriba). \
+Escribe para un mensaje de chat: directo, sin relleno, sin frases como "en \
+este paper los autores...". Ve al grano.\
 """
 
 _FICHA_SCHEMA = {
@@ -175,23 +207,52 @@ def generate_ficha(
     return FichaContent(**data)
 
 
+def _format_authors_for_reference(authors: list[str]) -> str:
+    """Formato compacto para la cita: nombres completos si son pocos autores,
+    "et al." si son varios - evita una lista larga de nombres completos sin
+    depender de parsear apellidos (fragil con apellidos compuestos)."""
+    if not authors:
+        return "(autores desconocidos)"
+    if len(authors) == 1:
+        return authors[0]
+    if len(authors) == 2:
+        return f"{authors[0]} & {authors[1]}"
+    if len(authors) == 3:
+        return f"{authors[0]}, {authors[1]} & {authors[2]}"
+    return f"{authors[0]} et al."
+
+
 def _format_reference(paper: Paper) -> str:
-    authors = ", ".join(paper.authors) or "(autores desconocidos)"
+    authors = _format_authors_for_reference(paper.authors)
     return f"{authors} ({paper.publication_year}). {paper.title}. {paper.journal}."
 
 
-def format_ficha_message(ficha: FichaContent, paper: Paper) -> str:
-    """Arma el texto final, listo para enviar por WhatsApp (Parte E adjunta el PDF aparte)."""
+def format_ficha_message(
+    ficha: FichaContent,
+    paper: Paper,
+    top_pick_reasoning: str | None = None,
+) -> str:
+    """Arma el texto final, listo para enviar por Telegram (Parte E adjunta el PDF aparte).
+
+    `top_pick_reasoning` es la razon (de la Parte B) de por que este paper se
+    eligio sobre los demas candidatos de la corrida - sin esto, la usuaria
+    recibe la ficha sin saber por que le llego justo este paper.
+    """
     sections = [
-        ("1. Pregunta", ficha.pregunta),
-        ("2. Contexto", ficha.contexto),
-        ("3. Metodo", ficha.metodo),
-        ("4. Identificacion", ficha.identificacion),
-        ("5. Mecanismos economicos", ficha.mecanismos),
-        ("6. Resultados", ficha.resultados),
-        ("7. Datos y muestra", ficha.datos_muestra),
-        ("8. Notas extra", ficha.notas_extra),
-        ("9. Referencia", _format_reference(paper)),
+        ("1. ❓ Pregunta", ficha.pregunta),
+        ("2. 📍 Contexto", ficha.contexto),
+        ("3. 🔬 Método", ficha.metodo),
+        ("4. 🎯 Identificación", ficha.identificacion),
+        ("5. ⚙️ Mecanismos económicos", ficha.mecanismos),
+        ("6. 📊 Resultados", ficha.resultados),
+        ("7. 🗂️ Datos y muestra", ficha.datos_muestra),
+        ("8. 📝 Notas extra", ficha.notas_extra),
+        ("9. 📚 Referencia", _format_reference(paper)),
     ]
     body = "\n\n".join(f"*{title}*\n{content}" for title, content in sections)
-    return f"{body}\n\n*10.* 📎 PDF adjunto"
+
+    header = ""
+    if top_pick_reasoning:
+        header = f"*🏆 Por qué esta semana*\n{top_pick_reasoning}\n\n"
+
+    return f"{header}{body}\n\n*10.* 📎 PDF adjunto"
