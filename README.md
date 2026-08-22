@@ -320,15 +320,32 @@ si falla, se reintenta en la próxima corrida.
 ### Costo
 
 Por defecto usa `claude-sonnet-5` con `effort="medium"` en ambas partes (A
-y B) — más barato que `claude-opus-5`/"high", suficiente para una tarea de
-búsqueda + clasificación/extracción (no necesita el modelo más caro). La
-Parte B además limita cuánto contenido de cada página se ingiere
-(`MAX_FETCH_CONTENT_TOKENS`, 6000 tokens) y bloquea los agregadores de
-empleo de las búsquedas — el mayor costo real es leer páginas completas
-con `web_fetch`, así que topearlo ayuda tanto al costo como a la
-relevancia. Si ves candidatos o fichas de baja calidad, se puede subir a
-`claude-opus-5`/"high" pasando `model=`/`effort=` a `discover_opportunities`
-o `extract_fichas`.
+y B). **El modelo pesa menos de lo que parece** — la corrida real del
+22/08 con este cambio ya aplicado costó ~$3.97 (10 candidatos, 2 lotes),
+casi lo mismo que con `claude-opus-5` antes. La causa real: cada
+`web_fetch`/`web_search` dentro de un mismo turno obliga a reenviar toda
+la conversación acumulada hasta ese punto, así que el costo crece mucho
+más rápido que lineal con la cantidad de llamadas a herramientas que se le
+permiten a un lote — no tanto con el precio por token del modelo.
+
+Por eso `extract_fichas` limita, además del modelo:
+- `batch_size=4` (candidatos por llamada) en vez de un número más alto.
+- `MAX_FETCH_USES_PER_BATCH` / `MAX_SEARCH_USES_PER_BATCH`: topes **fijos**
+  por lote (no escalados con `len(batch)`) — acotan cuántas llamadas a
+  herramientas puede encadenar una sola llamada a la API, que es lo que de
+  verdad dispara el costo.
+- `MAX_FETCH_CONTENT_TOKENS=4000`: cuánto contenido de cada página se
+  ingiere por fetch.
+
+Además, `discovery.py` bloquea los agregadores de empleo de las búsquedas
+(`BLOCKED_JOB_BOARD_DOMAINS`), lo que también ayuda a la relevancia.
+
+Cada corrida real imprime en los logs cuánto costó exactamente (ver
+`opportunities/usage.py` y la sección de Automatización) — no hay que
+adivinar. Si ves candidatos o fichas de baja calidad después de estos
+recortes, subir `claude-opus-5`/"high" o los topes de `max_uses` es la
+otra punta de la perilla, pasando `model=`/`effort=`/`batch_size=` a
+`discover_opportunities`/`extract_fichas`.
 
 ### Limitaciones conocidas
 
