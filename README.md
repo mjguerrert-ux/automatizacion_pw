@@ -4,6 +4,12 @@ Pipeline que recibe automáticamente papers académicos relevantes por WhatsApp,
 con resumen estructurado en español y PDF adjunto. Ver el spec completo para
 el diseño de todas las partes (A–F).
 
+Este repo también incluye un segundo pipeline, independiente pero pensado
+para compartir el mismo canal de envío: **oportunidades académicas**
+(fellowships pre-doctorales y posiciones de RA). Ver la sección
+[Sistema de oportunidades académicas](#sistema-de-oportunidades-académicas-por-whatsapp)
+más abajo.
+
 ## Estado actual: Partes A y B
 
 **A — conexión con OpenAlex.** Conecta con la [API de OpenAlex](https://docs.openalex.org/)
@@ -83,3 +89,78 @@ qué revistas entran, o refrescar el ranking de impacto), correr
 - **D.** Generación de la ficha estructurada en español con la API de Claude.
 - **E.** Envío por WhatsApp (Twilio o Meta Cloud API).
 - **F.** Automatización (cron / GitHub Actions), 2–3 veces por semana.
+
+---
+
+## Sistema de oportunidades académicas por WhatsApp
+
+Pipeline paralelo al de papers: recibe automáticamente por WhatsApp
+fellowships pre-doctorales y posiciones de research assistant (RA) que
+encajen con los intereses de la usuaria, en la misma ficha fija de siempre.
+
+**Tipo de posición:** fellowship pre-doctoral, o RA. **Universidad:** sin
+filtro. **Foco temático:** educación, particularmente investigación de
+profesores/labs que trabajan en países de middle income (ej. Uganda,
+Colombia) — ver el ejemplo de referencia abajo.
+
+No existe un equivalente a OpenAlex para este tipo de oportunidades (no hay
+una base de datos única y estructurada de fellowships/RA), así que este
+pipeline usa la API de Claude con sus herramientas de búsqueda (`web_search`)
+y de lectura de páginas (`web_fetch`) en vez de un cliente a una API externa.
+
+### Estructura
+
+```
+src/opportunities/
+  discovery.py  # Parte A: busca candidatos en la web (web_search)
+  extract.py    # Parte B: verifica cada candidato (web_fetch) y arma la ficha
+  format.py     # Arma el mensaje de WhatsApp con la ficha fija
+  store.py      # Evita reenviar una oportunidad ya notificada en corridas previas
+scripts/
+  discover_test_opportunities.py  # Parte A: prueba solo el descubrimiento
+  run_opportunities_test.py       # Corrida completa: descubre + verifica + arma ficha
+```
+
+### Ficha (formato fijo del mensaje)
+
+1. 🎓 Posición — tipo y nombre exacto
+2. 🏛️ Institución — universidad y profesor/lab a cargo
+3. 📍 Foco temático
+4. 🌍 Países involucrados
+5. 💰 Salario/financiamiento
+6. 📅 Fecha límite (o "no especificada")
+7. ✅ Requisitos clave
+8. 🔗 Link para aplicar
+
+### Ejemplo de referencia
+
+Embedded Development Lab (Harvard Graduate School of Education), bajo el
+profesor Vesall Nourani: fellowship pre-doctoral con foco en formación
+docente en Uganda y en la evaluación del programa educativo SAT de FUNDAEC
+en Colombia. No es un filtro literal — es el patrón a reconocer en otras
+universidades/labs.
+
+### Uso
+
+```bash
+pip install -r requirements.txt
+
+# Solo descubrimiento (Parte A)
+ANTHROPIC_API_KEY=sk-ant-... python scripts/discover_test_opportunities.py
+
+# Corrida completa: descubre, verifica y muestra los mensajes de WhatsApp
+ANTHROPIC_API_KEY=sk-ant-... python scripts/run_opportunities_test.py
+```
+
+Cada corrida guarda en `data/opportunities_seen.json` (no versionado) los
+links ya notificados, para no repetir la misma oportunidad en la siguiente
+corrida mientras siga abierta.
+
+### Limitaciones conocidas / próximos pasos
+
+- La cobertura depende de qué tan bien indexadas estén las páginas de los
+  labs/profesores en los motores de búsqueda que usa `web_search`; no hay
+  garantía de encontrar el 100% de las convocatorias abiertas.
+- Todavía no envía nada por WhatsApp: eso es la Parte E, compartida con el
+  pipeline de papers (Twilio o Meta Cloud API), y la Parte F de
+  automatización (cron / GitHub Actions) tampoco está implementada.
