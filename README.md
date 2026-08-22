@@ -46,8 +46,8 @@ pide que llene una ficha en español, calibrada al contexto de la usuaria. Hay
 que a uno puramente metodológico:
 
 - **Aplicado** (responde una pregunta sustantiva con un método): Pregunta,
-  Contexto, Método, Identificación, Efectos fijos y controles (interpretados,
-  no solo listados), Mecanismos económicos, Resultados, Datos y muestra.
+  Contexto, Método, Identificación, Efectos fijos y controles, Mecanismos
+  económicos, Resultados, Datos y muestra.
 - **Técnico/metodológico** (propone o diagnostica un estimador en sí mismo):
   Pregunta, El problema, El argumento, Ilustración empírica (breve,
   secundaria), Qué cambia en la práctica, Qué usar en su lugar.
@@ -55,15 +55,29 @@ que a uno puramente metodológico:
 Título/autores y Referencia se arman con los metadatos de OpenAlex, no con lo
 que transcriba el modelo, para que la cita sea siempre exacta. No hay un
 campo de "para tu trabajo": ese espacio se le dio a los campos conceptuales
-(identificación, mecanismos, el argumento) para que expliquen mejor la idea
-central, en vez de gastar palabras conectando con proyectos activos de la
-usuaria — eso ahora se resuelve preguntando directamente (ver Parte E).
+para que expliquen mejor la idea central, en vez de gastar palabras
+conectando con proyectos activos de la usuaria — eso ahora se resuelve
+preguntando directamente (ver Parte E).
 
-**E — envío por Telegram + preguntas de seguimiento.** Manda la ficha
-(texto, con `parse_mode="HTML"` para que la negrita se vea de verdad —
-Telegram no renderiza formato si no se lo pedís explícitamente) y el PDF
-(documento adjunto) por un bot de Telegram **separado** del pipeline de
-oportunidades — son dos chats distintos que no se mezclan.
+Las secciones más conceptuales (Identificación, Efectos fijos y controles,
+Mecanismos, Resultados / El problema, El argumento, Qué cambia en la
+práctica) tienen presupuestos de palabras generosos y una instrucción
+explícita de desarrollar la lógica paso a paso, no solo nombrar el
+concepto — el criterio es "¿alguien que no escribió el paper entendería
+esto, o solo se entera de que existe?". Efectos fijos y controles además se
+redacta como una **lista** (un bullet por cada efecto fijo/control, cada uno
+explicando la intuición económica de por qué hace falta), no como un
+párrafo. Para que esto quepa sin volver a pelear con el límite de 4096
+caracteres de Telegram, `format_ficha_message` manda la ficha en **dos
+mensajes** en vez de uno: el primero hasta Efectos fijos y controles (o
+Ilustración empírica en la técnica), el segundo con el resto + la
+referencia.
+
+**E — envío por Telegram + preguntas de seguimiento.** Manda la ficha (dos
+mensajes de texto, con `parse_mode="HTML"` para que la negrita se vea de
+verdad — Telegram no renderiza formato si no se lo pedís explícitamente) y
+el PDF (documento adjunto) por un bot de Telegram **separado** del pipeline
+de oportunidades — son dos chats distintos que no se mezclan.
 
 Además, la usuaria puede escribirle preguntas puntuales al bot sobre el
 **último paper enviado** y recibe una respuesta generada releyendo el PDF
@@ -183,12 +197,15 @@ qué revistas entran, o refrescar el ranking de impacto), correr
 - El `SYSTEM_PROMPT` de la Parte D pone un techo duro de **palabras** (no de
   oraciones) por campo — un límite por oraciones no funciona: el modelo lo
   cumple igual escribiendo una sola oración larguísima con comas y guiones,
-  sin bajar el largo real del mensaje. Con un paper metodológico denso
-  (Goodman-Bacon 2021), el mensaje final quedó en ~2200 caracteres (54% del
-  límite de Telegram) — antes del ajuste llegaba a 3900+ (96%), sin margen
-  para papers con más autores o notas más largas. Si en la práctica se
-  vuelve a acercar al límite, hay que bajar los topes de palabras en
-  `src/ficha/client.py`, no volver a un límite por oraciones.
+  sin bajar el largo real del mensaje. La ficha se manda en **dos mensajes**
+  de Telegram (no uno), lo que da margen de sobra para que las secciones
+  conceptuales sean genuinamente explicativas sin acercarse al límite de
+  4096 caracteres por mensaje — probado con Duflo (2001): 2444 y 1692
+  caracteres (60% y 41% del límite) pese al contenido mucho más detallado
+  que las primeras versiones. Si en la práctica algún mensaje se acerca al
+  límite, hay que bajar los topes de palabras en `src/ficha/client.py`
+  (nunca volver a un límite por oraciones) o repartir las secciones en más
+  de dos mensajes.
 
 Con esto, el pipeline de papers ya cubre las 6 partes del spec (A–F).
 
