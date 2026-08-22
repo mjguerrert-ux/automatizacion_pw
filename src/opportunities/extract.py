@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 import anthropic
 
 from opportunities.discovery import BLOCKED_JOB_BOARD_DOMAINS, Candidate
+from opportunities.usage import TokenUsage, usage_from_response
 
 DEFAULT_MODEL = "claude-sonnet-5"
 DEFAULT_BATCH_SIZE = 8
@@ -164,7 +165,9 @@ _EXTRACT_SCHEMA = {
 
 
 class ExtractError(RuntimeError):
-    pass
+    def __init__(self, message: str, usage: TokenUsage | None = None):
+        super().__init__(message)
+        self.usage = usage or TokenUsage()
 
 
 @dataclass
@@ -190,6 +193,8 @@ class OpportunityEvaluation:
 @dataclass
 class ExtractResult:
     evaluations: list[OpportunityEvaluation]
+    model: str
+    usage: TokenUsage
     raw: dict = field(repr=False)
 
 
@@ -211,7 +216,7 @@ def _extract_batch(
     batch: list[Candidate],
     model: str,
     effort: str,
-) -> tuple[list[OpportunityEvaluation], dict]:
+) -> tuple[list[OpportunityEvaluation], dict, TokenUsage]:
     """Verifica un solo lote (una llamada a la API). candidate_index en el
     resultado es local al lote (0-indexado dentro de `batch`)."""
     response = client.messages.create(
@@ -239,20 +244,26 @@ def _extract_batch(
         messages=[{"role": "user", "content": _format_candidates(batch)}],
     )
 
+    usage = usage_from_response(response)
+
     if response.stop_reason == "refusal":
         raise ExtractError(
             "Claude rechazo la verificacion "
-            f"(stop_details={getattr(response, 'stop_details', None)})."
+            f"(stop_details={getattr(response, 'stop_details', None)}).",
+            usage=usage,
         )
     if response.stop_reason == "pause_turn":
         raise ExtractError(
             "La verificacion se pauso a mitad de camino (pause_turn) y este "
-            "cliente no la reanuda automaticamente."
+            "cliente no la reanuda automaticamente.",
+            usage=usage,
         )
 
     text = next((b.text for b in response.content if b.type == "text"), None)
     if text is None:
-        raise ExtractError("La respuesta no incluyo un bloque de texto con el JSON esperado.")
+        raise ExtractError(
+            "La respuesta no incluyo un bloque de texto con el JSON esperado.", usage=usage
+        )
 
     data = json.loads(text)
     evaluations = []
@@ -277,7 +288,7 @@ def _extract_batch(
                 ficha=ficha,
             )
         )
-    return evaluations, data
+    return evaluations, data, usage
 
 
 def extract_fichas(
@@ -307,14 +318,19 @@ def extract_fichas(
     all_evaluations: list[OpportunityEvaluation] = []
     raw_batches = []
     failed_batches = 0
+    total_usage = TokenUsage()
     for start in range(0, len(candidates), batch_size):
         batch = candidates[start : start + batch_size]
         try:
-            batch_evaluations, batch_raw = _extract_batch(client, batch, model, effort)
-        except ExtractError:
+            batch_evaluations, batch_raw, batch_usage = _extract_batch(
+                client, batch, model, effort
+            )
+        except ExtractError as e:
             failed_batches += 1
+            total_usage = total_usage + e.usage
             continue
 
+        total_usage = total_usage + batch_usage
         for ev in batch_evaluations:
             all_evaluations.append(
                 OpportunityEvaluation(
@@ -328,7 +344,10 @@ def extract_fichas(
 
     if not all_evaluations:
         raise ExtractError(
-            f"Los {failed_batches} lote(s) de verificacion fallaron (pause_turn/rechazo)."
+            f"Los {failed_batches} lote(s) de verificacion fallaron (pause_turn/rechazo).",
+            usage=total_usage,
         )
 
-    return ExtractResult(evaluations=all_evaluations, raw={"batches": raw_batches})
+    return ExtractResult(
+        evaluations=all_evaluations, model=model, usage=total_usage, raw={"batches": raw_batches}
+    )

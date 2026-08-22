@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 
 import anthropic
 
+from opportunities.usage import TokenUsage, usage_from_response
+
 DEFAULT_MODEL = "claude-sonnet-5"
 DEFAULT_MAX_SEARCHES = 15
 
@@ -167,7 +169,9 @@ _DISCOVERY_SCHEMA = {
 
 
 class DiscoveryError(RuntimeError):
-    pass
+    def __init__(self, message: str, usage: TokenUsage | None = None):
+        super().__init__(message)
+        self.usage = usage or TokenUsage()
 
 
 @dataclass
@@ -181,6 +185,8 @@ class Candidate:
 @dataclass
 class DiscoveryResult:
     candidates: list[Candidate]
+    model: str
+    usage: TokenUsage
     raw: dict = field(repr=False)
 
 
@@ -226,21 +232,27 @@ def discover_opportunities(
         ],
     )
 
+    usage = usage_from_response(response)
+
     if response.stop_reason == "refusal":
         raise DiscoveryError(
             "Claude rechazo la busqueda "
-            f"(stop_details={getattr(response, 'stop_details', None)})."
+            f"(stop_details={getattr(response, 'stop_details', None)}).",
+            usage=usage,
         )
     if response.stop_reason == "pause_turn":
         raise DiscoveryError(
             "La busqueda se pauso a mitad de camino (pause_turn) y este cliente "
-            "no la reanuda automaticamente. Baja max_searches o reintenta."
+            "no la reanuda automaticamente. Baja max_searches o reintenta.",
+            usage=usage,
         )
 
     text = next((b.text for b in response.content if b.type == "text"), None)
     if text is None:
-        raise DiscoveryError("La respuesta no incluyo un bloque de texto con el JSON esperado.")
+        raise DiscoveryError(
+            "La respuesta no incluyo un bloque de texto con el JSON esperado.", usage=usage
+        )
 
     data = json.loads(text)
     candidates = [Candidate(**c) for c in data["candidates"]]
-    return DiscoveryResult(candidates=candidates, raw=data)
+    return DiscoveryResult(candidates=candidates, model=model, usage=usage, raw=data)
