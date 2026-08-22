@@ -24,10 +24,16 @@ from dataclasses import dataclass, field
 
 import anthropic
 
-from opportunities.discovery import Candidate
+from opportunities.discovery import BLOCKED_JOB_BOARD_DOMAINS, Candidate
 
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = "claude-sonnet-5"
 DEFAULT_BATCH_SIZE = 8
+
+# Tope de contenido por pagina fetcheada: una convocatoria no necesita la
+# pagina completa (con menu, footer, etc.) para extraer los 8 campos de la
+# ficha, y cada pagina de mas que se ingiere entera es el mayor costo de
+# esta llamada (hasta 2 fetches x candidato).
+MAX_FETCH_CONTENT_TOKENS = 6000
 
 SYSTEM_PROMPT = """\
 Verificas y estructuras oportunidades para una investigadora en economia \
@@ -66,6 +72,14 @@ Cada candidato debe encajar en el tipo de posicion Y el foco tematico de \
 UNO de los dos tracks de arriba. No sirve un postdoc, profesor titular/ \
 senior, staff administrativo u operativo sin componente de investigacion, \
 ni posiciones de maestria/PhD sin financiamiento como RA.
+
+## Fuentes: SOLO sitios oficiales
+apply_link tiene que ser la pagina oficial de la universidad/lab u \
+organismo, nunca un agregador de empleos (LinkedIn, Indeed, econjobmarket, \
+predoc.org, etc.). Si al visitar source_url encuentras que en realidad es \
+(o redirige a) un agregador, usa web_search para encontrar la pagina \
+oficial de la misma convocatoria y usa esa URL como apply_link. Si no la \
+encuentras, marca is_relevant=false.
 
 ## Tarea
 Para cada candidato que te paso (con su source_url), usa la herramienta \
@@ -205,11 +219,13 @@ def _extract_batch(
                 "type": "web_fetch_20260209",
                 "name": "web_fetch",
                 "max_uses": len(batch) * 2,
+                "max_content_tokens": MAX_FETCH_CONTENT_TOKENS,
             },
             {
                 "type": "web_search_20260209",
                 "name": "web_search",
                 "max_uses": len(batch),
+                "blocked_domains": BLOCKED_JOB_BOARD_DOMAINS,
             },
         ],
         messages=[{"role": "user", "content": _format_candidates(batch)}],
@@ -259,15 +275,16 @@ def _extract_batch(
 def extract_fichas(
     candidates: list[Candidate],
     model: str = DEFAULT_MODEL,
-    effort: str = "high",
+    effort: str = "medium",
     api_key: str | None = None,
     batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> ExtractResult:
     """Verifica cada candidato visitando su URL fuente y arma la ficha final.
 
-    `effort` por defecto es "high": decidir relevancia con criterio (dos \
-    condiciones simultaneas) y extraer datos precisos de paginas reales se \
-    beneficia de mas cuidado que una clasificacion simple sobre texto dado.
+    `model`/`effort` por defecto son el modelo economico (`claude-sonnet-5`) \
+    y "medium": verificar una convocatoria contra dos condiciones y \
+    extraer campos de una pagina ya fetcheada no necesita el modelo mas \
+    caro. Subi a `claude-opus-5`/"high" si ves fichas de baja calidad.
 
     Llama a la API en lotes de `batch_size` candidatos (ver docstring del \
     modulo) en vez de mandar todos los candidatos en un solo turno. Si un \

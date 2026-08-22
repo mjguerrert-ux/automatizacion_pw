@@ -228,6 +228,13 @@ Cubre dos tracks, ambos en economía con foco en educación:
   CAF, OCDE, UNESCO, UNICEF y organismos análogos, en el área de economía
   de la educación.
 
+**Solo fuentes oficiales.** Cada oportunidad tiene que venir de la página
+oficial de la universidad/lab o del organismo — nunca de una bolsa de
+empleo/agregador (LinkedIn, Indeed, econjobmarket, predoc.org, etc., ver
+`BLOCKED_JOB_BOARD_DOMAINS` en `discovery.py`). Un agregador puede servir
+para *encontrar* una oportunidad, pero el `apply_link` final siempre tiene
+que resolver a la página oficial de la convocatoria.
+
 No existe un equivalente a OpenAlex para este tipo de oportunidades (no hay
 una base de datos única y estructurada de fellowships/RA), así que este
 pipeline usa la API de Claude con sus herramientas de búsqueda (`web_search`)
@@ -298,11 +305,31 @@ siguiente corrida mientras siga abierta. `send_opportunities.py` solo marca
 una oportunidad como vista después de que el envío por Telegram fue exitoso;
 si falla, se reintenta en la próxima corrida.
 
+### Costo
+
+Por defecto usa `claude-sonnet-5` con `effort="medium"` en ambas partes (A
+y B) — más barato que `claude-opus-5`/"high", suficiente para una tarea de
+búsqueda + clasificación/extracción (no necesita el modelo más caro). La
+Parte B además limita cuánto contenido de cada página se ingiere
+(`MAX_FETCH_CONTENT_TOKENS`, 6000 tokens) y bloquea los agregadores de
+empleo de las búsquedas — el mayor costo real es leer páginas completas
+con `web_fetch`, así que topearlo ayuda tanto al costo como a la
+relevancia. Si ves candidatos o fichas de baja calidad, se puede subir a
+`claude-opus-5`/"high" pasando `model=`/`effort=` a `discover_opportunities`
+o `extract_fichas`.
+
 ### Limitaciones conocidas
 
 - La cobertura depende de qué tan bien indexadas estén las páginas de los
   labs/profesores/organismos en los motores de búsqueda que usa `web_search`;
   no hay garantía de encontrar el 100% de las convocatorias abiertas.
+- La Parte B (`extract_fichas`) verifica en lotes de 8 candidatos por
+  llamada (`batch_size`), no todos a la vez: con muchos candidatos en un
+  solo turno, Claude puede cortarlo a mitad de camino (`pause_turn`) antes
+  de devolver el resultado — pasó en la corrida real del 22/08 con 42
+  candidatos. Si un lote entero falla, se descarta ese lote (sus
+  candidatos se reintentan solos en la próxima corrida) en vez de abortar
+  toda la corrida.
 
 ---
 
