@@ -24,10 +24,16 @@ from dataclasses import dataclass, field
 
 import anthropic
 
-from opportunities.discovery import Candidate
+from opportunities.discovery import BLOCKED_JOB_BOARD_DOMAINS, Candidate
 
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = "claude-sonnet-5"
 DEFAULT_BATCH_SIZE = 8
+
+# Tope de contenido por pagina fetcheada: una convocatoria no necesita la
+# pagina completa (con menu, footer, etc.) para extraer los 8 campos de la
+# ficha, y cada pagina de mas que se ingiere entera es el mayor costo de
+# esta llamada (hasta 2 fetches x candidato).
+MAX_FETCH_CONTENT_TOKENS = 6000
 
 SYSTEM_PROMPT = """\
 Verificas y estructuras oportunidades para una investigadora en economia \
@@ -35,15 +41,13 @@ con foco en educacion. Hay dos tracks igual de validos:
 
 ## Track 1: academico
 - Tipo de posicion: fellowship pre-doctoral, o posicion de research \
-assistant / RA.
-- Foco tematico: el profesor/lab a cargo trabaja en educacion, y \
-particularmente en investigacion educativa situada en (o centrada en) \
-paises de middle income (ej. Uganda, Colombia, India, Kenia, Filipinas). \
-Universidad de origen: sin filtro, no importa cual sea.
+assistant / RA. Universidad de origen: sin filtro, no importa cual sea.
+- Foco tematico: el profesor/lab a cargo trabaja en educacion.
 - Ejemplo de referencia: Embedded Development Lab (Harvard Graduate School \
-of Education), profesor Vesall Nourani - fellowship pre-doctoral con foco \
-en formacion docente en Uganda y en la evaluacion del programa SAT de \
-FUNDAEC en Colombia.
+of Education), profesor Vesall Nourani - fellowship pre-doctoral de \
+educacion que, segun la usuaria, da prioridad a candidatos de paises de \
+middle income. Lo que lo hace un buen ejemplo NO es que investigue sobre \
+esos paises: es que el PROGRAMA prioriza candidatos que vienen de ahi.
 
 ## Track 2: entidades multilaterales / gubernamentales de desarrollo
 - Tipo de posicion: research analyst, research assistant, consultant de \
@@ -53,19 +57,35 @@ Professionals Program).
 - Institucion: Banco Mundial, BID/IADB, CAF, OCDE, UNESCO, UNICEF (incl. \
 Innocenti), u organismos analogos.
 - Foco tematico: economia de la educacion (evaluaciones de impacto, \
-politica educativa, analisis cuantitativo de programas educativos), \
-idealmente con foco en paises en desarrollo/middle income, aunque no es \
-excluyente si la institucion misma trabaja mayormente en esos paises.
+politica educativa, analisis cuantitativo de programas educativos).
 - Ejemplo de referencia: Research Analyst / Consultant en el equipo de \
 Educacion del Banco Mundial (Education Global Practice) o del BID \
-(Division de Educacion), apoyando evaluaciones de impacto y analisis \
-cuantitativo de politica educativa en paises en desarrollo.
+(Division de Educacion) - este tipo de organismos frecuentemente buscan \
+diversidad geografica y dan preferencia a candidatos de sus paises \
+miembro en desarrollo.
 
 ## Criterios de relevancia (aplica los DOS para el track que corresponda)
-Cada candidato debe encajar en el tipo de posicion Y el foco tematico de \
-UNO de los dos tracks de arriba. No sirve un postdoc, profesor titular/ \
-senior, staff administrativo u operativo sin componente de investigacion, \
-ni posiciones de maestria/PhD sin financiamiento como RA.
+Cada candidato debe encajar en el tipo de posicion Y el foco tematico \
+(educacion) de UNO de los dos tracks de arriba. No sirve un postdoc, \
+profesor titular/senior, staff administrativo u operativo sin componente \
+de investigacion, ni posiciones de maestria/PhD sin financiamiento como RA.
+
+## Señal de prioridad para la usuaria (no es un criterio de relevancia)
+La usuaria vive en Colombia. Si al visitar la pagina encuentras que el \
+programa da preferencia, cupos reservados, o dice buscar candidatos de \
+paises de middle income / en desarrollo / America Latina, Africa o Asia, \
+menciona eso explicitamente en thematic_focus (ver campo 3 abajo) - es \
+una senal fuerte a favor para ella. La AUSENCIA de esta senal no hace que \
+el candidato sea irrelevante: la mayoria de fellowships/RA son abiertas a \
+cualquier nacionalidad sin decirlo explicitamente.
+
+## Fuentes: SOLO sitios oficiales
+apply_link tiene que ser la pagina oficial de la universidad/lab u \
+organismo, nunca un agregador de empleos (LinkedIn, Indeed, econjobmarket, \
+predoc.org, etc.). Si al visitar source_url encuentras que en realidad es \
+(o redirige a) un agregador, usa web_search para encontrar la pagina \
+oficial de la misma convocatoria y usa esa URL como apply_link. Si no la \
+encuentras, marca is_relevant=false.
 
 ## Tarea
 Para cada candidato que te paso (con su source_url), usa la herramienta \
@@ -83,7 +103,9 @@ listos para mandar por Telegram:
 1. position: tipo y nombre exacto de la posicion.
 2. institution: la institucion (universidad u organismo) y el profesor/ \
 lab/division a cargo.
-3. thematic_focus: foco tematico (1-2 oraciones).
+3. thematic_focus: foco tematico (1-2 oraciones). Si el programa da \
+prioridad a candidatos de paises de middle income/en desarrollo, decilo \
+explicitamente aca (ver arriba).
 4. countries: paises involucrados (si no se especifica ninguno en \
 particular, di "no especificado").
 5. funding: salario/financiamiento (si no se especifica, di "no \
@@ -205,11 +227,13 @@ def _extract_batch(
                 "type": "web_fetch_20260209",
                 "name": "web_fetch",
                 "max_uses": len(batch) * 2,
+                "max_content_tokens": MAX_FETCH_CONTENT_TOKENS,
             },
             {
                 "type": "web_search_20260209",
                 "name": "web_search",
                 "max_uses": len(batch),
+                "blocked_domains": BLOCKED_JOB_BOARD_DOMAINS,
             },
         ],
         messages=[{"role": "user", "content": _format_candidates(batch)}],
@@ -259,15 +283,16 @@ def _extract_batch(
 def extract_fichas(
     candidates: list[Candidate],
     model: str = DEFAULT_MODEL,
-    effort: str = "high",
+    effort: str = "medium",
     api_key: str | None = None,
     batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> ExtractResult:
     """Verifica cada candidato visitando su URL fuente y arma la ficha final.
 
-    `effort` por defecto es "high": decidir relevancia con criterio (dos \
-    condiciones simultaneas) y extraer datos precisos de paginas reales se \
-    beneficia de mas cuidado que una clasificacion simple sobre texto dado.
+    `model`/`effort` por defecto son el modelo economico (`claude-sonnet-5`) \
+    y "medium": verificar una convocatoria contra dos condiciones y \
+    extraer campos de una pagina ya fetcheada no necesita el modelo mas \
+    caro. Subi a `claude-opus-5`/"high" si ves fichas de baja calidad.
 
     Llama a la API en lotes de `batch_size` candidatos (ver docstring del \
     modulo) en vez de mandar todos los candidatos en un solo turno. Si un \

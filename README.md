@@ -219,14 +219,31 @@ encajen con los intereses de la usuaria, en la misma ficha fija de siempre.
 
 Cubre dos tracks, ambos en economía con foco en educación:
 
-- **Académico:** fellowship pre-doctoral o RA, en cualquier universidad,
-  con foco en profesores/labs que trabajan en educación en países de
-  middle income (ej. Uganda, Colombia) — ver el ejemplo de referencia abajo.
+- **Académico:** fellowship pre-doctoral o RA, en cualquier universidad
+  (sin filtro geográfico — puede ser top de EEUU/Europa, como el ejemplo
+  de referencia), con foco en profesores/labs que trabajan en educación.
 - **Entidades multilaterales / gubernamentales de desarrollo:** research
   analyst, research assistant, consultant de investigación, o programas de
   young professionals (ej. WBG YPP, IADB YPP) en Banco Mundial, BID/IADB,
   CAF, OCDE, UNESCO, UNICEF y organismos análogos, en el área de economía
   de la educación.
+
+**"Middle income" es sobre a quién prioriza el programa, no sobre el tema
+de investigación.** La usuaria vive en Colombia, así que el pipeline
+destaca (sin excluir al resto) las oportunidades que dan preferencia
+explícita a candidatos de países de middle income/en desarrollo — igual
+que el ejemplo de referencia: lo que lo hace relevante no es que investigue
+*sobre* Uganda/Colombia, es que el programa prioriza candidatos *de* esos
+países. La mayoría de fellowships de RA/pre-doc no lo dicen explícitamente
+y siguen siendo relevantes igual; cuando el pipeline encuentra esa señal,
+la deja en el campo de foco temático de la ficha.
+
+**Solo fuentes oficiales.** Cada oportunidad tiene que venir de la página
+oficial de la universidad/lab o del organismo — nunca de una bolsa de
+empleo/agregador (LinkedIn, Indeed, econjobmarket, predoc.org, etc., ver
+`BLOCKED_JOB_BOARD_DOMAINS` en `discovery.py`). Un agregador puede servir
+para *encontrar* una oportunidad, pero el `apply_link` final siempre tiene
+que resolver a la página oficial de la convocatoria.
 
 No existe un equivalente a OpenAlex para este tipo de oportunidades (no hay
 una base de datos única y estructurada de fellowships/RA), así que este
@@ -267,13 +284,15 @@ No son un filtro literal — son el patrón a reconocer en otras
 universidades/labs/organismos.
 
 - **Académico:** Embedded Development Lab (Harvard Graduate School of
-  Education), bajo el profesor Vesall Nourani: fellowship pre-doctoral con
-  foco en formación docente en Uganda y en la evaluación del programa
-  educativo SAT de FUNDAEC en Colombia.
+  Education), bajo el profesor Vesall Nourani: fellowship pre-doctoral de
+  educación que, según la usuaria, da prioridad a candidatos de países de
+  middle income — por eso le interesa particularmente a ella, que vive en
+  Colombia.
 - **Multilateral:** Research Analyst / Consultant en el equipo de
   Educación del Banco Mundial (Education Global Practice) o del BID
-  (División de Educación), apoyando evaluaciones de impacto y análisis
-  cuantitativo de política educativa en países en desarrollo.
+  (División de Educación) — este tipo de organismos frecuentemente buscan
+  diversidad geográfica y dan preferencia a candidatos de sus países
+  miembro en desarrollo.
 
 ### Uso
 
@@ -298,11 +317,31 @@ siguiente corrida mientras siga abierta. `send_opportunities.py` solo marca
 una oportunidad como vista después de que el envío por Telegram fue exitoso;
 si falla, se reintenta en la próxima corrida.
 
+### Costo
+
+Por defecto usa `claude-sonnet-5` con `effort="medium"` en ambas partes (A
+y B) — más barato que `claude-opus-5`/"high", suficiente para una tarea de
+búsqueda + clasificación/extracción (no necesita el modelo más caro). La
+Parte B además limita cuánto contenido de cada página se ingiere
+(`MAX_FETCH_CONTENT_TOKENS`, 6000 tokens) y bloquea los agregadores de
+empleo de las búsquedas — el mayor costo real es leer páginas completas
+con `web_fetch`, así que topearlo ayuda tanto al costo como a la
+relevancia. Si ves candidatos o fichas de baja calidad, se puede subir a
+`claude-opus-5`/"high" pasando `model=`/`effort=` a `discover_opportunities`
+o `extract_fichas`.
+
 ### Limitaciones conocidas
 
 - La cobertura depende de qué tan bien indexadas estén las páginas de los
   labs/profesores/organismos en los motores de búsqueda que usa `web_search`;
   no hay garantía de encontrar el 100% de las convocatorias abiertas.
+- La Parte B (`extract_fichas`) verifica en lotes de 8 candidatos por
+  llamada (`batch_size`), no todos a la vez: con muchos candidatos en un
+  solo turno, Claude puede cortarlo a mitad de camino (`pause_turn`) antes
+  de devolver el resultado — pasó en la corrida real del 22/08 con 42
+  candidatos. Si un lote entero falla, se descarta ese lote (sus
+  candidatos se reintentan solos en la próxima corrida) en vez de abortar
+  toda la corrida.
 
 ---
 

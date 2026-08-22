@@ -16,24 +16,52 @@ from dataclasses import dataclass, field
 
 import anthropic
 
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = "claude-sonnet-5"
 DEFAULT_MAX_SEARCHES = 15
+
+# Bolsas de empleo / agregadores: bloqueados de la busqueda porque la
+# oportunidad tiene que reportarse con la URL de la fuente oficial (pagina
+# de la universidad/lab, o del organismo), no la del agregador que la
+# indexa. econjobmarket/predoc.org, LinkedIn, Indeed, etc. sirven para
+# encontrar candidatos pero no como fuente final.
+BLOCKED_JOB_BOARD_DOMAINS = [
+    "linkedin.com",
+    "indeed.com",
+    "glassdoor.com",
+    "ziprecruiter.com",
+    "simplyhired.com",
+    "idealist.org",
+    "reliefweb.int",
+    "devex.com",
+    "unjobs.org",
+    "higheredjobs.com",
+    "insidehighered.com",
+    "chronicle.com",
+    "jobs.ac.uk",
+    "academicpositions.com",
+    "econjobmarket.org",
+    "predoc.org",
+]
 
 # Ejemplos de referencia para calibrar que tipo de oportunidad se busca. No
 # son un filtro literal (no hay que limitarse a estas instituciones/personas):
 # son el patron a reconocer en otras universidades/labs/organismos.
 REFERENCE_EXAMPLE_ACADEMIC = """\
 Embedded Development Lab (EDeL), Harvard Graduate School of Education, bajo \
-el profesor Vesall Nourani: fellowship pre-doctoral con foco en formacion \
-docente en Uganda y en la evaluacion del programa educativo SAT de FUNDAEC \
-en Colombia.\
+el profesor Vesall Nourani: fellowship pre-doctoral de educacion (con \
+trabajo de campo en Uganda y Colombia) que, segun la usuaria, da prioridad \
+a candidatos de paises de middle income - por eso le interesa \
+particularmente a ella, que vive en Colombia. Importante: lo que hace a \
+esta fellowship un buen ejemplo NO es que investigue sobre esos paises, \
+es que el PROGRAMA prioriza candidatos que vienen de ahi.\
 """
 
 REFERENCE_EXAMPLE_MULTILATERAL = """\
 Research Analyst / Consultant en el equipo de Educacion del Banco Mundial \
 (Education Global Practice) o del Banco Interamericano de Desarrollo \
-(Division de Educacion), apoyando evaluaciones de impacto y analisis \
-cuantitativo de politica educativa en paises en desarrollo.\
+(Division de Educacion) - este tipo de organismos frecuentemente buscan \
+diversidad geografica entre sus candidatos y dan preferencia a personas de \
+sus paises miembro en desarrollo, lo cual favorece a la usuaria.\
 """
 
 SYSTEM_PROMPT = f"""\
@@ -44,12 +72,17 @@ economia con foco en educacion:
 ## Track 1: academico
 - Tipo de posicion: fellowship pre-doctoral, o posicion de research \
 assistant / RA (full-time o part-time, remota o presencial).
-- Universidad: sin filtro, cualquiera sirve. Lo que importa es el tema.
-- Foco tematico: laboratorios o profesores que trabajan en educacion, \
-particularmente investigacion educativa situada en (o centrada en) paises \
-de middle income (ej. Uganda, Colombia, India, Kenia, Filipinas, etc). \
-Tambien cuentan posiciones de educacion en general con un lab/PI activo en \
-investigacion aplicada, aunque el pais especifico varie.
+- Universidad: sin filtro, cualquiera sirve (top de EEUU/Europa, o \
+cualquier otra) - lo que importa es el tema y a quien favorece el programa.
+- Foco tematico: laboratorios o profesores que trabajan en educacion.
+- Señal de prioridad (destacar cuando aparece, NO excluyente si no \
+aparece): fellowships/programas que explicitamente dan preferencia, cupos \
+reservados, o dicen buscar candidatos de paises de middle income / en \
+desarrollo / de America Latina, Africa o Asia. Esto favorece directamente \
+a la usuaria, que vive en Colombia - resaltalo en las notas si lo ves. La \
+MAYORIA de fellowships de RA/pre-doctorales son abiertas a cualquier \
+nacionalidad sin decirlo explicitamente, asi que la ausencia de esta señal \
+no descarta al candidato.
 - Ejemplo de referencia: {REFERENCE_EXAMPLE_ACADEMIC}
 
 ## Track 2: entidades multilaterales / gubernamentales de desarrollo
@@ -59,39 +92,55 @@ investigacion aplicada, aunque el pais especifico varie.
 Program), en el area de economia con foco especial en educacion.
 - Instituciones: Banco Mundial (World Bank), Banco Interamericano de \
 Desarrollo (BID/IADB), CAF - Banco de Desarrollo de America Latina, OCDE, \
-UNESCO, UNICEF (incl. UNICEF Innocenti), y organismos analogos. Sin \
-filtro adicional de pais dentro de estas instituciones.
-- Foco tematico: economia de la educacion — evaluaciones de impacto, \
-politica educativa, analisis cuantitativo de programas educativos, \
-particularmente (aunque no exclusivamente) en paises en desarrollo/middle \
-income.
+UNESCO, UNICEF (incl. UNICEF Innocenti), y organismos analogos.
+- Foco tematico: educacion especificamente — evaluaciones de impacto, \
+politica educativa, analisis cuantitativo de programas educativos. \
+Prioriza posiciones de educacion por encima de otras areas de estos \
+organismos (salud, infraestructura, macro, etc.).
+- Señal de prioridad (destacar cuando aparece): programas que buscan \
+diversidad geografica o dan preferencia a candidatos de paises miembro en \
+desarrollo/middle income (comun en programas como el WBG YPP o el IADB \
+YPP) - favorece a la usuaria, que vive en Colombia.
 - Ejemplo de referencia: {REFERENCE_EXAMPLE_MULTILATERAL}
+
+## Fuentes: SOLO sitios oficiales, nada de bolsas de empleo
+Cada candidato tiene que venir de la pagina oficial de la universidad/lab \
+o del organismo (ej. un dominio de la universidad, o worldbank.org, \
+iadb.org, caf.com, oecd.org, unesco.org, unicef.org) — nunca de un \
+agregador de empleos (LinkedIn, Indeed, econjobmarket, predoc.org, etc.). \
+Si encuentras la mencion de una oportunidad en un agregador, segui el \
+rastro hasta la pagina oficial de la convocatoria y reporta esa URL, no \
+la del agregador. Si no encontras la pagina oficial, descarta el candidato.
 
 ## Tarea
 Usa la herramienta de busqueda web para encontrar posiciones ABIERTAS \
 actualmente (o que abren pronto) de cualquiera de los dos tracks. Para el \
-track academico, busca en sitios de universidades (paginas de labs, "join \
-our lab", "we're hiring"), en boletines de RA como econjobmarket/predoc.org, \
-y en paginas de profesores de escuelas de educacion (Harvard GSE, Stanford \
-GSE, etc.) y de economia del desarrollo que trabajen en educacion. Para el \
-track multilateral, busca directamente en los portales de empleo/consultoria \
-de cada institucion (ej. jobs.worldbank.org, BID careers/talento, CAF \
-empleos, OCDE careers, UNESCO/UNICEF careers) filtrando por educacion o por \
-el area de economia/investigacion.
+track academico, busca directamente en sitios de universidades (paginas \
+de labs, "join our lab", "we're hiring") y en paginas de profesores de \
+escuelas de educacion (Harvard GSE, Stanford GSE, etc.) y de economia del \
+desarrollo que trabajen en educacion. Para el track multilateral, busca \
+directamente en los portales de empleo/consultoria de cada institucion \
+(ej. jobs.worldbank.org, BID careers/talento, CAF empleos, OCDE careers, \
+UNESCO/UNICEF careers) filtrando por educacion.
 
 Para cada candidato que encuentres, reporta:
 1. title_raw: el titulo/nombre de la posicion tal como aparece.
 2. institution_raw: universidad y, si se menciona, el profesor/lab a cargo.
-3. source_url: la URL exacta de la pagina donde encontraste la posicion \
-(no un resultado de busqueda generico, sino el link a la convocatoria).
+3. source_url: la URL exacta de la pagina OFICIAL donde encontraste la \
+posicion (no un resultado de busqueda generico ni un agregador de empleos, \
+sino el link a la convocatoria en el sitio de la universidad/organismo).
 4. notes: cualquier detalle relevante que veas en el resultado de busqueda \
-(foco tematico, paises, fecha limite) - se van a verificar despues \
-visitando el link, asi que no hace falta que sean exhaustivas.
+(foco tematico, fecha limite, y en particular si el programa menciona dar \
+preferencia a candidatos de paises en desarrollo/middle income) - se van a \
+verificar despues visitando el link, asi que no hace falta que sean \
+exhaustivas.
 
 No incluyas posiciones claramente fuera de los dos tracks (postdoc, \
 profesor titular/senior, staff administrativo o de operaciones sin \
-componente de investigacion). Si tienes dudas sobre si algo encaja, \
-inclúyelo igual: hay un paso posterior que filtra con mas cuidado.\
+componente de investigacion). Si tienes dudas sobre si algo encaja \
+tematicamente, inclúyelo igual: hay un paso posterior que filtra con mas \
+cuidado. Lo que SI hay que descartar sin dudar es cualquier candidato cuya \
+unica fuente sea un agregador de empleos.\
 """
 
 _DISCOVERY_SCHEMA = {
@@ -138,14 +187,15 @@ class DiscoveryResult:
 def discover_opportunities(
     model: str = DEFAULT_MODEL,
     max_searches: int = DEFAULT_MAX_SEARCHES,
-    effort: str = "high",
+    effort: str = "medium",
     api_key: str | None = None,
 ) -> DiscoveryResult:
     """Busca en la web candidatos de fellowships pre-doctorales / posiciones RA.
 
-    `effort` por defecto es "high": encontrar y elegir buenas queries de \
-    busqueda si se beneficia de mas razonamiento que un filtro de relevancia \
-    sobre texto ya dado (Parte B del pipeline de papers).
+    `model`/`effort` por defecto son el modelo economico (`claude-sonnet-5`) \
+    y "medium": esto es una busqueda + clasificacion, no una tarea que se \
+    beneficie de mas razonamiento que eso. Subi a `claude-opus-5`/"high" si \
+    ves que los candidatos que encuentra son de baja calidad.
     """
     client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
 
@@ -162,6 +212,7 @@ def discover_opportunities(
                 "type": "web_search_20260209",
                 "name": "web_search",
                 "max_uses": max_searches,
+                "blocked_domains": BLOCKED_JOB_BOARD_DOMAINS,
             }
         ],
         messages=[
