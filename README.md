@@ -40,15 +40,28 @@ que responda 200) antes de darlo por bueno.
 
 **D — generación de la ficha.** Con el PDF ya descargado (Parte C), le pasa el
 PDF completo a la API de Claude (como documento, no como texto extraído) y le
-pide que llene los primeros 8 campos de la ficha del spec (pregunta, contexto,
-método, identificación, mecanismos, resultados, datos y muestra, notas extra),
-en español y calibrada al contexto de la usuaria. La referencia completa (9) se
-arma con los metadatos de OpenAlex, no con lo que transcriba el modelo, para
-que la cita sea siempre exacta.
+pide que llene una ficha en español, calibrada al contexto de la usuaria. Hay
+**dos plantillas** — Claude elige cuál usar después de leer el paper completo
+(campo `tipo`), porque un solo formato no le sirve igual a un paper aplicado
+que a uno puramente metodológico:
 
-**E — envío por Telegram.** Manda la ficha (texto) y el PDF (documento
-adjunto) por un bot de Telegram **separado** del pipeline de oportunidades
-— son dos chats distintos que no se mezclan. Ver
+- **Aplicado** (responde una pregunta sustantiva con un método): Pregunta,
+  Contexto, Método, Identificación, Efectos fijos y controles (interpretados,
+  no solo listados), Mecanismos económicos, Resultados, Datos y muestra, Para
+  tu trabajo.
+- **Técnico/metodológico** (propone o diagnostica un estimador en sí mismo):
+  Pregunta, El problema, El argumento, Ilustración empírica (breve,
+  secundaria), Qué cambia en la práctica, Qué usar en su lugar, Para tu
+  trabajo.
+
+Título/autores y Referencia se arman con los metadatos de OpenAlex, no con lo
+que transcriba el modelo, para que la cita sea siempre exacta.
+
+**E — envío por Telegram.** Manda la ficha (texto, con `parse_mode="HTML"`
+para que la negrita se vea de verdad — Telegram no renderiza formato si no
+se lo pedís explícitamente) y el PDF (documento adjunto) por un bot de
+Telegram **separado** del pipeline de oportunidades — son dos chats
+distintos que no se mezclan. Ver
 [Envío por Telegram](#envío-por-telegram-parte-e) más abajo para el detalle
 compartido, y la sección de variables de entorno de esta parte para el bot
 específico de papers.

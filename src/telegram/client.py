@@ -40,11 +40,20 @@ def send_telegram_message(
     text: str,
     chat_id: str | None = None,
     bot_token: str | None = None,
+    parse_mode: str | None = None,
 ) -> int:
     """Manda `text` por Telegram via el bot. Devuelve el message_id.
 
     `chat_id` y `bot_token` se toman de TELEGRAM_CHAT_ID / TELEGRAM_BOT_TOKEN
     si no se pasan explicitamente.
+
+    `parse_mode`: None (default) manda texto plano - si `text` tiene
+    caracteres tipo "*negrita*" o "<b>negrita</b>", Telegram los muestra
+    LITERALES, no los renderiza (bug facil de no notar). Pasar "HTML" para
+    que Telegram interprete tags <b>/<i>/etc; en ese caso, cualquier texto
+    dinamico insertado en `text` debe venir ya escapado (ver
+    ficha.client._escape_html) para que un "&"/"<"/">" del contenido no
+    rompa el parseo.
     """
     bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
     if not bot_token:
@@ -65,10 +74,14 @@ def send_telegram_message(
             f"{MAX_TEXT_LENGTH} por mensaje. Acortalo antes de mandar."
         )
 
+    payload = {"chat_id": chat_id, "text": text}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+
     try:
         resp = requests.post(
             f"{API_BASE}/bot{bot_token}/sendMessage",
-            json={"chat_id": chat_id, "text": text},
+            json=payload,
             timeout=30,
         )
         data = resp.json()
