@@ -94,7 +94,7 @@ para el bot específico de papers.
 **F — automatización.** `.github/workflows/papers.yml` corre
 `scripts/send_papers.py` solo, **lunes, martes y jueves a las 7:00am hora
 Colombia** — horario distinto al del pipeline de oportunidades (lun/mié/vie
-8am), para que no lleguen los dos mensajes el mismo momento (ese job queda
+1pm), para que no lleguen los dos mensajes el mismo momento (ese job queda
 corriendo ~10 minutos extra al final, por la ráfaga de preguntas descrita
 arriba). Guarda en `data/` (vía cache de Actions, igual que oportunidades)
 los `openalex_id` ya enviados y el paper "actual" para las preguntas de
@@ -364,7 +364,7 @@ Los dos pipelines corren solos, sin intervención manual, vía GitHub Actions
 
 | Workflow | Script | Horario (hora Colombia) |
 |---|---|---|
-| `.github/workflows/opportunities.yml` | `scripts/send_opportunities.py` | Lunes, miércoles y viernes 8:00am |
+| `.github/workflows/opportunities.yml` | `scripts/send_opportunities.py` | Lunes, miércoles y viernes 1:00pm |
 | `.github/workflows/papers.yml` | `scripts/send_papers.py` | Lunes, martes y jueves 7:00am |
 
 **Setup (una sola vez por workflow), en la página del repo en GitHub:**
