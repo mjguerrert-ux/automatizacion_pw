@@ -15,6 +15,18 @@ devolver el JSON final - pasó en la corrida real del 22/08 con 42
 candidatos. Si un lote entero falla (pause_turn, rechazo), se descarta ese
 lote en vez de abortar toda la corrida (sus candidatos no quedan marcados
 como vistos, asi que se reintentan solos en la proxima corrida).
+
+El costo real no es tanto el modelo (`claude-sonnet-5` es barato por
+token) sino la CANTIDAD de llamadas a herramientas dentro de un mismo
+turno: cada `web_fetch`/`web_search` obliga a reenviar toda la
+conversacion acumulada hasta ese punto para decidir el siguiente paso, asi
+que el costo crece mucho mas rapido que lineal con el numero de llamadas.
+En la corrida real del 22/08 (ver commit), 10 candidatos en 2 lotes de
+batch_size=8 con max_uses escalado por lote (hasta 16 fetches + 8
+busquedas por lote) costaron ~$3.47 en tokens de verificacion. Por eso
+`batch_size` es chico (4) y los `max_uses` de las tools son topes FIJOS
+bajos (no escalados por `len(batch)`), no solo para evitar `pause_turn`
+sino para acotar cuantas llamadas puede encadenar una sola corrida.
 """
 
 from __future__ import annotations
@@ -28,13 +40,22 @@ from opportunities.discovery import BLOCKED_JOB_BOARD_DOMAINS, Candidate
 from opportunities.usage import TokenUsage, usage_from_response
 
 DEFAULT_MODEL = "claude-sonnet-5"
-DEFAULT_BATCH_SIZE = 8
+DEFAULT_BATCH_SIZE = 4
 
 # Tope de contenido por pagina fetcheada: una convocatoria no necesita la
 # pagina completa (con menu, footer, etc.) para extraer los 8 campos de la
-# ficha, y cada pagina de mas que se ingiere entera es el mayor costo de
-# esta llamada (hasta 2 fetches x candidato).
-MAX_FETCH_CONTENT_TOKENS = 6000
+# ficha, y cada pagina de mas que se ingiere entera es costo directo.
+MAX_FETCH_CONTENT_TOKENS = 4000
+
+# Topes FIJOS de llamadas a herramientas por lote (NO escalados por
+# len(batch)): el costo real viene de la conversacion acumulada que se
+# reenvia en cada llamada dentro del mismo turno, asi que mas llamadas
+# permitidas = costo mucho mas que lineal, no solo mas candidatos cubiertos.
+# 1 fetch por candidato del lote alcanza en el caso normal (discovery.py ya
+# filtra a fuentes oficiales); el resto es margen para 1-2 candidatos que
+# necesiten un fallback de busqueda.
+MAX_FETCH_USES_PER_BATCH = DEFAULT_BATCH_SIZE
+MAX_SEARCH_USES_PER_BATCH = 2
 
 SYSTEM_PROMPT = """\
 Verificas y estructuras oportunidades para una investigadora en economia \
@@ -231,13 +252,13 @@ def _extract_batch(
             {
                 "type": "web_fetch_20260209",
                 "name": "web_fetch",
-                "max_uses": len(batch) * 2,
+                "max_uses": MAX_FETCH_USES_PER_BATCH,
                 "max_content_tokens": MAX_FETCH_CONTENT_TOKENS,
             },
             {
                 "type": "web_search_20260209",
                 "name": "web_search",
-                "max_uses": len(batch),
+                "max_uses": MAX_SEARCH_USES_PER_BATCH,
                 "blocked_domains": BLOCKED_JOB_BOARD_DOMAINS,
             },
         ],
