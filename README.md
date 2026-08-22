@@ -193,38 +193,99 @@ si Twilio falla, se reintenta en la próxima corrida.
 
 Módulo compartido por ambos pipelines (`src/whatsapp/client.py`), vía la API
 de WhatsApp de [Twilio](https://www.twilio.com/docs/whatsapp/quickstart/python).
+Twilio (y WhatsApp/Meta detrás) distinguen dos formas de mandar un mensaje,
+y cuál te sirve depende de si el envío es automático o no:
 
-**Setup (una sola vez):**
-1. Crear una cuenta de Twilio (el sandbox de WhatsApp es gratis para probar).
-2. En la consola de Twilio: Messaging → Try it out → Send a WhatsApp message,
-   y unir tu número al sandbox mandando el código indicado por WhatsApp al
-   número de sandbox de Twilio.
-3. Copiar `Account SID` y `Auth Token` de la consola.
+- **Texto libre** (`send_whatsapp_message`, con `body`): solo se entrega
+  como *respuesta* dentro de una sesión de 24h que abre el destinatario al
+  escribirte. Sirve para el **sandbox de pruebas** de Twilio.
+- **Plantilla aprobada por Meta** (`send_whatsapp_template`, con
+  `content_sid`): obligatoria para cualquier mensaje que **vos** iniciás sin
+  que la usuaria haya escrito antes — exactamente lo que hace el cron
+  (Parte F) cada corrida. El sandbox **no soporta** plantillas propias, así
+  que el cron automático necesita un WhatsApp sender de producción.
 
-**Variables de entorno:**
+En resumen: el sandbox alcanza para probar el pipeline manualmente, pero
+para el envío automático real hace falta completar el registro del sender
+y crear una plantilla — son los pasos 2 y 3 de abajo.
+
+### 1. Sandbox (pruebas manuales rápidas)
+
+1. Crear una cuenta de Twilio (gratis).
+2. En la consola: Messaging → Try it out → Send a WhatsApp message (o
+   directamente [console.twilio.com/console/sms/whatsapp/sandbox](https://www.twilio.com/console/sms/whatsapp/sandbox)
+   — el sandbox vive en la consola "legacy", no en la pantalla nueva de
+   "Numbers & Senders").
+3. Unir tu número al sandbox mandándole por WhatsApp el código ("join
+   ...") que te da esa página.
+4. Copiar `Account SID` y `Auth Token` de Account Info.
+
+```bash
+# Prueba de humo: manda un mensaje de texto suelto (funciona ~24h desde que
+# te uniste, o desde tu ultimo mensaje al sandbox)
+TWILIO_ACCOUNT_SID=AC... TWILIO_AUTH_TOKEN=... \
+    TWILIO_WHATSAPP_TO=whatsapp:+573001234567 \
+    python scripts/send_test_whatsapp.py
+```
+
+Con esto ya podés correr `run_opportunities_test.py` (imprime, no manda) y
+`send_opportunities.py` sin `TWILIO_CONTENT_SID` (manda texto libre) para
+validar la calidad del pipeline. **No sirve para el cron** — ver la nota de
+`send_opportunities.py` cuando corre sin plantilla.
+
+### 2. Sender de producción (necesario para el cron)
+
+En la consola nueva: **Numbers & Senders → WhatsApp → Create new sender**.
+El flujo pide, en orden:
+1. Elegir un número (podés usar uno de Twilio, no hace falta uno propio).
+2. Conectar con Meta ("Continue with Facebook") e iniciar sesión.
+3. Crear o elegir un **Meta Business Portfolio** (se puede crear ahí mismo
+   si no tenés uno).
+4. Crear o elegir una **WhatsApp Business Account (WABA)**.
+5. Completar el perfil: nombre de cuenta, nombre visible para el
+   destinatario, categoría del "negocio", y opcionalmente descripción/sitio.
+6. Verificar el número (SMS o llamada).
+
+El sender queda activo apenas termina el flujo, con límites iniciales (~250
+mensajes/24h) hasta que Meta complete la verificación empresarial completa
+— de sobra para 3 corridas/semana con un solo destinatario.
+
+### 3. Content Template (para que el cron pueda mandar)
+
+En la consola: **Content Template Builder** (link en la misma pantalla de
+WhatsApp Senders). Creá una plantilla con este texto exacto, para que
+coincida con `format_whatsapp_message` / `ficha_content_variables`
+(`src/opportunities/format.py`):
+
+```
+🎓 Posición: {{1}}
+🏛️ Institución: {{2}}
+📍 Foco temático: {{3}}
+🌍 Países involucrados: {{4}}
+💰 Salario/financiamiento: {{5}}
+📅 Fecha límite: {{6}}
+✅ Requisitos clave: {{7}}
+🔗 Link para aplicar: {{8}}
+```
+
+Categoría: "Utility" (es una notificación informativa, no marketing).
+Mandala a aprobación — Meta suele resolver en minutos a pocas horas para
+plantillas simples como esta. Una vez aprobada, la consola te da un
+`content_sid` (empieza con `HX...`); esa es tu variable `TWILIO_CONTENT_SID`.
+
+### Variables de entorno
 
 | Variable | Obligatoria | Descripción |
 |---|---|---|
 | `TWILIO_ACCOUNT_SID` | sí | Desde la consola de Twilio. |
 | `TWILIO_AUTH_TOKEN` | sí | Desde la consola de Twilio. |
 | `TWILIO_WHATSAPP_TO` | sí | Número destino, formato `whatsapp:+<código país><número>`. |
-| `TWILIO_WHATSAPP_FROM` | no | Por defecto usa el número de sandbox de Twilio. Solo hace falta si tienes un número de WhatsApp Business propio. |
+| `TWILIO_CONTENT_SID` | para el cron | ID de la plantilla aprobada (paso 3). Sin ella, `send_opportunities.py` cae a texto libre (solo sirve con sesión abierta). |
+| `TWILIO_WHATSAPP_FROM` | no | Por defecto usa el número de sandbox. Poné acá tu número de sender de producción (paso 2) una vez lo tengas. |
 
-```bash
-# Prueba de humo: manda un mensaje de texto suelto
-TWILIO_ACCOUNT_SID=AC... TWILIO_AUTH_TOKEN=... \
-    TWILIO_WHATSAPP_TO=whatsapp:+573001234567 \
-    python scripts/send_test_whatsapp.py
-```
-
-**Límite:** Twilio permite hasta 1600 caracteres por mensaje de WhatsApp;
-`send_whatsapp_message` levanta `WhatsAppError` si el mensaje lo supera (las
-fichas de oportunidades caben cómodamente dentro de ese límite).
-
-**Nota sobre el sandbox:** mientras no se verifique un número de WhatsApp
-Business propio, el sandbox de Twilio solo entrega mensajes a números que ya
-se unieron a él (paso 2 arriba) — sirve para desarrollo/pruebas personales,
-no para mandarle el pipeline a otra persona sin que también se una.
+**Límite:** Twilio permite hasta 1600 caracteres por mensaje de texto libre;
+`send_whatsapp_message` levanta `WhatsAppError` si lo supera (no aplica a
+`send_whatsapp_template`, que usa el límite de la plantilla).
 
 ---
 
@@ -236,10 +297,15 @@ GitHub Actions: `.github/workflows/opportunities.yml` ejecuta
 hora Colombia**.
 
 **Setup (una sola vez), en la página del repo en GitHub:**
-1. Settings → Secrets and variables → Actions → New repository secret, y
+1. Completar los pasos 2 y 3 de la sección "Envío por WhatsApp" arriba
+   (sender de producción + plantilla aprobada) — sin `TWILIO_CONTENT_SID`
+   el workflow manda texto libre, que el cron no puede entregar (no hay
+   sesión abierta, nadie le escribió antes).
+2. Settings → Secrets and variables → Actions → New repository secret, y
    agregar: `ANTHROPIC_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
-   `TWILIO_WHATSAPP_TO` (y `TWILIO_WHATSAPP_FROM` si no usas el sandbox).
-2. Mergear la rama con este workflow a la rama default del repo (`main`) —
+   `TWILIO_WHATSAPP_TO`, `TWILIO_CONTENT_SID` (y `TWILIO_WHATSAPP_FROM` con
+   tu número de sender de producción).
+3. Mergear la rama con este workflow a la rama default del repo (`main`) —
    los triggers de horario (`schedule`) de GitHub Actions **solo** se activan
    con la versión del workflow que está en la rama default, no en una rama
    feature. Sin este paso el cron queda inactivo aunque el archivo ya exista.

@@ -12,7 +12,12 @@ name: Oportunidades académicas por WhatsApp
 # Requiere estos secrets del repo (Settings > Secrets and variables >
 # Actions > New repository secret):
 #   ANTHROPIC_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
-#   TWILIO_WHATSAPP_TO y, opcional, TWILIO_WHATSAPP_FROM.
+#   TWILIO_WHATSAPP_TO, TWILIO_CONTENT_SID, y opcional TWILIO_WHATSAPP_FROM.
+#
+# TWILIO_CONTENT_SID es obligatoria para que el cron funcione de verdad:
+# como este workflow siempre inicia la conversacion (nunca responde a un
+# mensaje previo), WhatsApp exige una plantilla aprobada por Meta - texto
+# libre no se entrega fuera de una sesion. Ver README > Automatización.
 
 on:
   schedule:
@@ -52,5 +57,6 @@ jobs:
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           TWILIO_WHATSAPP_TO: ${{ secrets.TWILIO_WHATSAPP_TO }}
+          TWILIO_CONTENT_SID: ${{ secrets.TWILIO_CONTENT_SID }}
           TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
         run: python scripts/send_opportunities.py
