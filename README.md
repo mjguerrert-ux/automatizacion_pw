@@ -265,7 +265,7 @@ oportunidades caben cómodamente dentro de ese límite).
 
 El pipeline de oportunidades corre solo, sin intervención manual, vía
 GitHub Actions: `.github/workflows/opportunities.yml` ejecuta
-`scripts/send_opportunities.py` **lunes, miércoles y viernes a las 8:00am
+`scripts/send_opportunities.py` **lunes, miércoles y viernes a la 1:00pm
 hora Colombia**.
 
 **Setup (una sola vez), en la página del repo en GitHub:**
