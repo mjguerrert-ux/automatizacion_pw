@@ -219,14 +219,24 @@ encajen con los intereses de la usuaria, en la misma ficha fija de siempre.
 
 Cubre dos tracks, ambos en economía con foco en educación:
 
-- **Académico:** fellowship pre-doctoral o RA, en cualquier universidad,
-  con foco en profesores/labs que trabajan en educación en países de
-  middle income (ej. Uganda, Colombia) — ver el ejemplo de referencia abajo.
+- **Académico:** fellowship pre-doctoral o RA, en cualquier universidad
+  (sin filtro geográfico — puede ser top de EEUU/Europa, como el ejemplo
+  de referencia), con foco en profesores/labs que trabajan en educación.
 - **Entidades multilaterales / gubernamentales de desarrollo:** research
   analyst, research assistant, consultant de investigación, o programas de
   young professionals (ej. WBG YPP, IADB YPP) en Banco Mundial, BID/IADB,
   CAF, OCDE, UNESCO, UNICEF y organismos análogos, en el área de economía
   de la educación.
+
+**"Middle income" es sobre a quién prioriza el programa, no sobre el tema
+de investigación.** La usuaria vive en Colombia, así que el pipeline
+destaca (sin excluir al resto) las oportunidades que dan preferencia
+explícita a candidatos de países de middle income/en desarrollo — igual
+que el ejemplo de referencia: lo que lo hace relevante no es que investigue
+*sobre* Uganda/Colombia, es que el programa prioriza candidatos *de* esos
+países. La mayoría de fellowships de RA/pre-doc no lo dicen explícitamente
+y siguen siendo relevantes igual; cuando el pipeline encuentra esa señal,
+la deja en el campo de foco temático de la ficha.
 
 **Solo fuentes oficiales.** Cada oportunidad tiene que venir de la página
 oficial de la universidad/lab o del organismo — nunca de una bolsa de
@@ -274,13 +284,15 @@ No son un filtro literal — son el patrón a reconocer en otras
 universidades/labs/organismos.
 
 - **Académico:** Embedded Development Lab (Harvard Graduate School of
-  Education), bajo el profesor Vesall Nourani: fellowship pre-doctoral con
-  foco en formación docente en Uganda y en la evaluación del programa
-  educativo SAT de FUNDAEC en Colombia.
+  Education), bajo el profesor Vesall Nourani: fellowship pre-doctoral de
+  educación que, según la usuaria, da prioridad a candidatos de países de
+  middle income — por eso le interesa particularmente a ella, que vive en
+  Colombia.
 - **Multilateral:** Research Analyst / Consultant en el equipo de
   Educación del Banco Mundial (Education Global Practice) o del BID
-  (División de Educación), apoyando evaluaciones de impacto y análisis
-  cuantitativo de política educativa en países en desarrollo.
+  (División de Educación) — este tipo de organismos frecuentemente buscan
+  diversidad geográfica y dan preferencia a candidatos de sus países
+  miembro en desarrollo.
 
 ### Uso
 

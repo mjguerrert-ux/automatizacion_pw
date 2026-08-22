@@ -48,16 +48,20 @@ BLOCKED_JOB_BOARD_DOMAINS = [
 # son el patron a reconocer en otras universidades/labs/organismos.
 REFERENCE_EXAMPLE_ACADEMIC = """\
 Embedded Development Lab (EDeL), Harvard Graduate School of Education, bajo \
-el profesor Vesall Nourani: fellowship pre-doctoral con foco en formacion \
-docente en Uganda y en la evaluacion del programa educativo SAT de FUNDAEC \
-en Colombia.\
+el profesor Vesall Nourani: fellowship pre-doctoral de educacion (con \
+trabajo de campo en Uganda y Colombia) que, segun la usuaria, da prioridad \
+a candidatos de paises de middle income - por eso le interesa \
+particularmente a ella, que vive en Colombia. Importante: lo que hace a \
+esta fellowship un buen ejemplo NO es que investigue sobre esos paises, \
+es que el PROGRAMA prioriza candidatos que vienen de ahi.\
 """
 
 REFERENCE_EXAMPLE_MULTILATERAL = """\
 Research Analyst / Consultant en el equipo de Educacion del Banco Mundial \
 (Education Global Practice) o del Banco Interamericano de Desarrollo \
-(Division de Educacion), apoyando evaluaciones de impacto y analisis \
-cuantitativo de politica educativa en paises en desarrollo.\
+(Division de Educacion) - este tipo de organismos frecuentemente buscan \
+diversidad geografica entre sus candidatos y dan preferencia a personas de \
+sus paises miembro en desarrollo, lo cual favorece a la usuaria.\
 """
 
 SYSTEM_PROMPT = f"""\
@@ -68,12 +72,17 @@ economia con foco en educacion:
 ## Track 1: academico
 - Tipo de posicion: fellowship pre-doctoral, o posicion de research \
 assistant / RA (full-time o part-time, remota o presencial).
-- Universidad: sin filtro, cualquiera sirve. Lo que importa es el tema.
-- Foco tematico (el criterio mas importante): laboratorios o profesores \
-que trabajan en educacion, con investigacion situada en (o centrada en) \
-paises de middle income (ej. Uganda, Colombia, India, Kenia, Filipinas, \
-etc). Cuanto mas se parezca al ejemplo de referencia (educacion + middle \
-income especifico), mejor candidato es.
+- Universidad: sin filtro, cualquiera sirve (top de EEUU/Europa, o \
+cualquier otra) - lo que importa es el tema y a quien favorece el programa.
+- Foco tematico: laboratorios o profesores que trabajan en educacion.
+- Señal de prioridad (destacar cuando aparece, NO excluyente si no \
+aparece): fellowships/programas que explicitamente dan preferencia, cupos \
+reservados, o dicen buscar candidatos de paises de middle income / en \
+desarrollo / de America Latina, Africa o Asia. Esto favorece directamente \
+a la usuaria, que vive en Colombia - resaltalo en las notas si lo ves. La \
+MAYORIA de fellowships de RA/pre-doctorales son abiertas a cualquier \
+nacionalidad sin decirlo explicitamente, asi que la ausencia de esta señal \
+no descarta al candidato.
 - Ejemplo de referencia: {REFERENCE_EXAMPLE_ACADEMIC}
 
 ## Track 2: entidades multilaterales / gubernamentales de desarrollo
@@ -83,13 +92,15 @@ income especifico), mejor candidato es.
 Program), en el area de economia con foco especial en educacion.
 - Instituciones: Banco Mundial (World Bank), Banco Interamericano de \
 Desarrollo (BID/IADB), CAF - Banco de Desarrollo de America Latina, OCDE, \
-UNESCO, UNICEF (incl. UNICEF Innocenti), y organismos analogos. Sin \
-filtro adicional de pais dentro de estas instituciones (por su mandato, \
-casi todo lo que hacen ya es sobre paises en desarrollo/middle income).
-- Foco tematico (el criterio mas importante): educacion especificamente \
-— evaluaciones de impacto, politica educativa, analisis cuantitativo de \
-programas educativos. Prioriza posiciones de educacion por encima de \
-otras areas de estos organismos (salud, infraestructura, macro, etc.).
+UNESCO, UNICEF (incl. UNICEF Innocenti), y organismos analogos.
+- Foco tematico: educacion especificamente — evaluaciones de impacto, \
+politica educativa, analisis cuantitativo de programas educativos. \
+Prioriza posiciones de educacion por encima de otras areas de estos \
+organismos (salud, infraestructura, macro, etc.).
+- Señal de prioridad (destacar cuando aparece): programas que buscan \
+diversidad geografica o dan preferencia a candidatos de paises miembro en \
+desarrollo/middle income (comun en programas como el WBG YPP o el IADB \
+YPP) - favorece a la usuaria, que vive en Colombia.
 - Ejemplo de referencia: {REFERENCE_EXAMPLE_MULTILATERAL}
 
 ## Fuentes: SOLO sitios oficiales, nada de bolsas de empleo
@@ -119,8 +130,10 @@ Para cada candidato que encuentres, reporta:
 posicion (no un resultado de busqueda generico ni un agregador de empleos, \
 sino el link a la convocatoria en el sitio de la universidad/organismo).
 4. notes: cualquier detalle relevante que veas en el resultado de busqueda \
-(foco tematico, paises, fecha limite) - se van a verificar despues \
-visitando el link, asi que no hace falta que sean exhaustivas.
+(foco tematico, fecha limite, y en particular si el programa menciona dar \
+preferencia a candidatos de paises en desarrollo/middle income) - se van a \
+verificar despues visitando el link, asi que no hace falta que sean \
+exhaustivas.
 
 No incluyas posiciones claramente fuera de los dos tracks (postdoc, \
 profesor titular/senior, staff administrativo o de operaciones sin \
