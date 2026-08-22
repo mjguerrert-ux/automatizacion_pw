@@ -77,9 +77,10 @@ def main() -> None:
     except FichaError as e:
         sys.exit(f"Error generando la ficha: {e}")
 
-    print("\n" + "=" * 60)
-    print(format_ficha_message(ficha, top, top_pick_reasoning=assessment.top_pick_reasoning))
-    print("=" * 60)
+    messages = format_ficha_message(ficha, top, top_pick_reasoning=assessment.top_pick_reasoning)
+    for i, part in enumerate(messages, start=1):
+        print(f"\n{'=' * 20} mensaje {i}/{len(messages)} ({len(part)} caracteres) {'=' * 20}")
+        print(part)
 
 
 if __name__ == "__main__":

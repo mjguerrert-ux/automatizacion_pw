@@ -19,6 +19,11 @@ Que cambia en la practica, Que usar en su lugar, Referencia, PDF adjunto.
 Titulo/autores y Referencia se arman con los metadatos de OpenAlex (Parte A),
 no con lo que transcriba el modelo - la cita siempre es exacta. El resto de
 campos los llena Claude leyendo el PDF completo.
+
+El mensaje se manda en DOS partes de Telegram (format_ficha_message devuelve
+una lista de 2 strings) para poder ser genuinamente explicativo en las
+secciones mas conceptuales sin pelear contra el limite de 4096 caracteres
+de un solo mensaje.
 """
 
 from __future__ import annotations
@@ -62,76 +67,97 @@ mismo (ej. una descomposicion de un estimador existente, un nuevo estimador, \
 una correccion a una practica estandar). La aplicacion empirica (si la hay) es \
 secundaria - existe para ilustrar el punto tecnico, no es el objetivo del paper.
 
-Todos los campos de texto de abajo van por Telegram: el mensaje completo no \
-puede pasar de 4096 caracteres, y comparte espacio con un encabezado y una \
-referencia. Cada limite de palabras es un TECHO DURO - contalas antes de \
-responder. Es un limite de PALABRAS, no de oraciones: no lo cumplas escribiendo \
-una sola oracion larguisima llena de comas, guiones y parentesis - si el paper \
-tiene mucho detalle (formulas, muchas especificaciones, varios tests), CORTA \
-contenido, no comprimas la sintaxis para que quepa todo. Ante la duda entre \
-completitud y brevedad, elegi brevedad. Toda cifra que des tiene que salir \
-literalmente del PDF (no la inventes ni la redondees sin decir "aprox."). Las \
-secciones se leen en orden, como una explicacion continua - cada una debe \
-conectar con la anterior (ej. "por eso...", "esto implica que...", no un salto \
-brusco de tema), no son campos sueltos e independientes. Nunca repitas entre \
-campos lo que ya dijiste en otro.
+Todos los campos de texto de abajo van por Telegram, repartidos en DOS \
+mensajes (cada uno con su propio limite de 4096 caracteres, asi que hay \
+espacio de sobra - la prioridad ahora es que se ENTIENDA la idea, no la \
+brevedad a cualquier costo). Cada limite de palabras sigue siendo un TECHO \
+DURO - contalas antes de responder - pero es mucho mas generoso que antes: \
+usalo. Es un limite de PALABRAS, no de oraciones: no lo cumplas escribiendo \
+una sola oracion larguisima llena de comas, guiones y parentesis - preferi \
+varias oraciones cortas que construyan la idea paso a paso. Toda cifra que \
+des tiene que salir literalmente del PDF (no la inventes ni la redondees sin \
+decir "aprox."). Las secciones se leen en orden, como una explicacion \
+continua - cada una debe conectar con la anterior (ej. "por eso...", "esto \
+implica que...", no un salto brusco de tema), no son campos sueltos e \
+independientes. Nunca repitas entre campos lo que ya dijiste en otro.
+
+CRITERIO GENERAL para identificacion, efectos_fijos_controles, mecanismos, \
+resultados, el_problema, el_argumento y que_cambia_en_la_practica: no estas \
+resumiendo el paper para alguien que ya lo entiende, estas EXPLICANDO la \
+logica para que quede clara de una sola lectura. Si una idea depende de un \
+concepto previo, no lo des por sentado - desarrollalo en una frase antes de \
+usarlo. Si una analogia o un numero concreto ayuda a que la intuicion quede \
+clara, usalo. Preferi "esto pasa porque X, y X pasa porque Y" a solo nombrar \
+X. Al terminar de escribir cada uno de estos campos, releelo y preguntate: \
+¿alguien que no elaboro este paper entenderia la logica completa con esto, o \
+solo se entera de que existe? Si es lo segundo, reescribilo.
 
 ## Si tipo = "aplicado"
 
-- pregunta (25 palabras maximo): que esta tratando de responder el paper.
-- contexto (20 palabras maximo): lugar y anios del estudio (donde y cuando se \
+- pregunta (30 palabras maximo): que esta tratando de responder el paper.
+- contexto (25 palabras maximo): lugar y anios del estudio (donde y cuando se \
 recolectaron los datos o se dio el fenomeno estudiado, no el anio de publicacion).
 - metodo (12 palabras maximo, etiqueta corta - NO una oracion completa): ej. \
 "DiD con Callaway-Sant'Anna", "RD con discontinuidad en edad", "VI con shock de \
 oferta".
-- identificacion (65 palabras maximo): cual es el shock y cuales son las \
-reglas de juego institucionales que generan la variacion que el paper explota. \
-Explica COMO funciona la estrategia de identificacion en terminos generales - \
-NO derives formulas, NO description paso a paso de un test estadistico. Usa \
-el espacio extra para que quede clara la logica, no para meter mas detalle \
-tecnico incidental.
-- efectos_fijos_controles (50 palabras maximo): que efectos fijos/controles usa \
-el paper y que interpretacion tienen - que fuente de confusion especifica \
-descartan (no listes los nombres de las variables sin mas: interpreta que \
-comparacion queda "limpia" gracias a cada uno). Si el paper no usa un panel \
-con efectos fijos (ej. es un experimento o una RD simple), decilo brevemente \
-en vez de forzar el campo.
-- mecanismos (45 palabras maximo): la teoria economica de por que deberia \
+- identificacion (110 palabras maximo): cual es el shock y cuales son las \
+reglas de juego institucionales que generan la variacion que el paper explota, \
+y POR QUE esa variacion permite aislar el efecto causal (que comparacion \
+"limpia" queda armada, y de que amenaza a la identificacion protege). NO \
+derives formulas ni hagas una descripcion paso a paso de un test estadistico - \
+pero si explica la logica completa, no solo el nombre de la estrategia.
+- efectos_fijos_controles: NO es un parrafo - es una lista, un bullet por \
+cada efecto fijo o control relevante que use el paper, en este formato \
+exacto por linea: "• <nombre del efecto fijo o control>: <que fuente de \
+confusion especifica descarta y por que hace falta descartarla - la \
+intuicion economica, no solo la mecanica estadistica>". Maximo 4 bullets \
+(elegi los mas importantes si hay mas), ~25-35 palabras cada uno. Si el \
+paper no usa un panel con efectos fijos (ej. es un experimento o una RD \
+simple), el campo puede ser una sola oracion breve explicando por que no \
+hacen falta, en vez de una lista.
+- mecanismos (80 palabras maximo): la teoria economica de por que deberia \
 pasar lo que el paper predice o encuentra - el "por que" normativo/teorico, NO \
-el "como" tecnico (eso ya esta en identificacion). Desarrolla la logica \
-economica en vez de solo nombrarla (ej. no digas solo "seleccion", explica que \
-tipo de seleccion y por que opera en este contexto).
-- resultados (60 palabras maximo): el hallazgo principal, con la magnitud del \
-efecto en unidades interpretables (puntos porcentuales, desviaciones estandar, \
-pesos, anios de escolaridad, etc.) - nunca solo "el efecto es significativo". \
-Si hay muchas especificaciones alternativas, da SOLO el rango, sin nombrar cada \
-una.
-- datos_muestra (18 palabras maximo): fuente de los datos y tamanio de la \
+el "como" tecnico (eso ya esta en identificacion). Desarrolla la cadena \
+causal completa (ej. no digas solo "seleccion": explica que decision toman \
+los agentes, con que informacion, y por que eso produce el patron que ves en \
+los resultados).
+- resultados (100 palabras maximo): el hallazgo principal, con la magnitud \
+del efecto en unidades interpretables (puntos porcentuales, desviaciones \
+estandar, pesos, anios de escolaridad, etc.) - nunca solo "el efecto es \
+significativo". Interpreta la magnitud en terminos concretos (ej. "equivale \
+a X" o comparado con la media de la variable) en vez de solo reportar el \
+numero. Si hay muchas especificaciones alternativas, da el rango y que \
+implica esa variacion (es robusto, o es fragil a la especificacion).
+- datos_muestra (20 palabras maximo): fuente de los datos y tamanio de la \
 muestra.
 
 ## Si tipo = "tecnico"
 
-- pregunta (20 palabras maximo): el problema metodologico que ataca el paper - \
+- pregunta (25 palabras maximo): el problema metodologico que ataca el paper - \
 NO lo redactes como si fuera una pregunta de politica publica.
-- el_problema (50 palabras maximo): que falla en la practica estandar actual - \
-por que el enfoque que todo el mundo usa hoy puede estar mal, y en que \
-situacion especificamente.
-- el_argumento (70 palabras maximo): el resultado tecnico central del paper, \
+- el_problema (70 palabras maximo): que falla en la practica estandar actual, \
+y POR QUE falla - construi la intuicion de la falla (que supuesto implicito \
+se rompe, en que situacion concreta), no solo la afirmes.
+- el_argumento (110 palabras maximo): el resultado tecnico central del paper, \
 explicado en palabras (no en notacion) - que muestra el paper y por que eso \
-es cierto, a alto nivel. Este es el corazon de la ficha: usa el espacio para \
-que la logica quede realmente clara, no solo nombrada.
-- ilustracion_empirica (30 palabras maximo): el caso empirico que usan para \
+es cierto, con la logica completa. Este es el corazon de la ficha: si hace \
+falta, usa un ejemplo numerico simple o una analogia para que la intuicion \
+quede clara, no solo el resultado formal.
+- ilustracion_empirica (35 palabras maximo): el caso empirico que usan para \
 mostrar el problema/argumento - es secundario, mencionalo brevemente (que \
 pregunta sustantiva usan de ejemplo, no como si fuera el foco del paper).
-- que_cambia_en_la_practica (50 palabras maximo): numeros concretos de la \
-correccion - cuanto cambia una estimacion tipica al aplicar lo que propone el \
-paper, en la ilustracion empirica u otro ejemplo que de el paper.
+- que_cambia_en_la_practica (80 palabras maximo): numeros concretos de la \
+correccion - cuanto cambia una estimacion tipica al aplicar lo que propone \
+el paper, en la ilustracion empirica u otro ejemplo que de el paper, e \
+interpreta que tan grande es ese cambio en terminos practicos (cambia el \
+signo, la magnitud, la significancia).
 - que_usar_en_su_lugar (25 palabras maximo): el estimador, test o comando \
 concreto que el paper recomienda usar en vez de la practica estandar (si el \
 paper es puramente diagnostico y no prescribe una alternativa, decilo).
 
 Escribe para un mensaje de chat: directo, sin relleno, sin frases como "en \
-este paper los autores...". Ve al grano.\
+este paper los autores...". Ve al grano, pero sin sacrificar que la logica \
+quede completa.\
 """
 
 _APLICADO_SCHEMA = {
@@ -300,13 +326,20 @@ def _format_titulo_autores(paper: Paper) -> str:
     return f"{paper.title} — {authors} ({paper.publication_year})"
 
 
+def _render_section(title: str, content: str) -> str:
+    return f"<b>{title}</b>\n{escape_html(content)}"
+
+
 def format_ficha_message(
     ficha: FichaContent,
     paper: Paper,
     top_pick_reasoning: str | None = None,
-) -> str:
-    """Arma el texto final en HTML (parse_mode=HTML), listo para enviar por
-    Telegram (Parte E adjunta el PDF aparte).
+) -> list[str]:
+    """Arma el texto final en HTML (parse_mode=HTML), como DOS mensajes
+    listos para enviar por Telegram en secuencia (Parte E adjunta el PDF
+    aparte, despues de estos dos). Se manda en dos partes para poder ser
+    genuinamente explicativo en las secciones conceptuales sin pelear contra
+    el limite de 4096 caracteres de un solo mensaje.
 
     Usa la plantilla A (aplicado) o B (tecnico) segun `ficha.tipo`.
 
@@ -314,38 +347,44 @@ def format_ficha_message(
     eligio sobre los demas candidatos de la corrida - sin esto, la usuaria
     recibe la ficha sin saber por que le llego justo este paper.
     """
+    header = [f"📄 <b>{escape_html(_format_titulo_autores(paper))}</b>"]
+    if top_pick_reasoning:
+        header.append(f"🏆 <b>Por qué esta semana</b>\n{escape_html(top_pick_reasoning)}")
+
     if ficha.tipo == "aplicado":
-        sections = [
+        part1_sections = [
             ("📌 Pregunta", ficha.pregunta),
             ("📍 Contexto", ficha.contexto),
             ("🔧 Método", ficha.metodo),
             ("🎯 Identificación", ficha.identificacion),
             ("🎛️ Efectos fijos y controles", ficha.efectos_fijos_controles),
+        ]
+        part2_sections = [
             ("💡 Mecanismos económicos", ficha.mecanismos),
             ("📊 Resultados", ficha.resultados),
             ("📚 Datos y muestra", ficha.datos_muestra),
         ]
     elif ficha.tipo == "tecnico":
-        sections = [
+        part1_sections = [
             ("📌 Pregunta", ficha.pregunta),
             ("⚠️ El problema", ficha.el_problema),
             ("🧮 El argumento", ficha.el_argumento),
             ("🖼️ Ilustración empírica", ficha.ilustracion_empirica),
+        ]
+        part2_sections = [
             ("📊 Qué cambia en la práctica", ficha.que_cambia_en_la_practica),
             ("🛠️ Qué usar en su lugar", ficha.que_usar_en_su_lugar),
         ]
     else:
         raise FichaError(f"Tipo de ficha desconocido: {ficha.tipo!r}")
 
-    parts = [f"📄 <b>{escape_html(_format_titulo_autores(paper))}</b>"]
+    part1 = "\n\n".join(header + [_render_section(t, c) for t, c in part1_sections])
+    part2 = "\n\n".join(
+        [_render_section(t, c) for t, c in part2_sections]
+        + [
+            f"📖 <b>Referencia</b>\n{escape_html(_format_reference(paper))}",
+            "📎 PDF adjunto",
+        ]
+    )
 
-    if top_pick_reasoning:
-        parts.append(f"🏆 <b>Por qué esta semana</b>\n{escape_html(top_pick_reasoning)}")
-
-    for title, content in sections:
-        parts.append(f"<b>{title}</b>\n{escape_html(content)}")
-
-    parts.append(f"📖 <b>Referencia</b>\n{escape_html(_format_reference(paper))}")
-    parts.append("📎 PDF adjunto")
-
-    return "\n\n".join(parts)
+    return [part1, part2]
