@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import date
 
 import anthropic
 
@@ -109,13 +110,30 @@ predoc.org, etc.). Si al visitar source_url encuentras que en realidad es \
 oficial de la misma convocatoria y usa esa URL como apply_link. Si no la \
 encuentras, marca is_relevant=false.
 
+## Vigencia (requisito obligatorio, no solo relevancia tematica)
+El mensaje del usuario empieza con "Fecha de hoy: YYYY-MM-DD". Una \
+convocatoria puede encajar perfecto en el track y foco tematico y seguir \
+siendo is_relevant=false si ya no esta vigente. Marca is_relevant=false \
+(reasoning: "convocatoria vencida" + el motivo puntual) si encuentras \
+cualquiera de estas señales en la pagina:
+- Una fecha limite de aplicacion anterior a la fecha de hoy.
+- Una fecha de inicio de la posicion (ej. "empieza en enero de 2026") \
+anterior a la fecha de hoy, sin evidencia de que exista un ciclo \
+posterior todavia abierto.
+- Texto explicito de que la posicion ya fue llenada, ya no recibe \
+aplicaciones, o esta marcada "closed"/"not recruiting"/"position filled".
+Si la pagina no menciona ninguna fecha limite ni de inicio, y nada indica \
+que este cerrada, trata la convocatoria como vigente - la ausencia de \
+fecha no es motivo para descartarla.
+
 ## Tarea
 Para cada candidato que te paso (con su source_url), usa la herramienta \
 web_fetch para visitar esa URL y verificar la informacion real de la \
-convocatoria. Si la pagina ya no esta disponible o la posicion ya cerro/fue \
-llenada, marca is_relevant=false con el motivo. Si la URL no carga pero \
-tienes evidencia solida en las notas de que la posicion es real y vigente, \
-puedes usar web_search para intentar encontrar la pagina correcta.
+convocatoria, incluyendo su vigencia (ver arriba). Si la pagina ya no esta \
+disponible o la posicion ya cerro/fue llenada, marca is_relevant=false con \
+el motivo. Si la URL no carga pero tienes evidencia solida en las notas de \
+que la posicion es real y vigente, puedes usar web_search para intentar \
+encontrar la pagina correcta.
 
 Para cada candidato, evalua los criterios de arriba (is_relevant + \
 reasoning en espanol, indicando a cual track corresponde) y, si es \
@@ -219,8 +237,8 @@ class ExtractResult:
     raw: dict = field(repr=False)
 
 
-def _format_candidates(candidates: list[Candidate]) -> str:
-    blocks = []
+def _format_candidates(candidates: list[Candidate], today: str) -> str:
+    blocks = [f"Fecha de hoy: {today}"]
     for i, c in enumerate(candidates):
         blocks.append(
             f"### Candidato {i}\n"
@@ -237,6 +255,7 @@ def _extract_batch(
     batch: list[Candidate],
     model: str,
     effort: str,
+    today: str,
 ) -> tuple[list[OpportunityEvaluation], dict, TokenUsage]:
     """Verifica un solo lote (una llamada a la API). candidate_index en el
     resultado es local al lote (0-indexado dentro de `batch`)."""
@@ -262,7 +281,7 @@ def _extract_batch(
                 "blocked_domains": BLOCKED_JOB_BOARD_DOMAINS,
             },
         ],
-        messages=[{"role": "user", "content": _format_candidates(batch)}],
+        messages=[{"role": "user", "content": _format_candidates(batch, today)}],
     )
 
     usage = usage_from_response(response)
@@ -318,6 +337,7 @@ def extract_fichas(
     effort: str = "medium",
     api_key: str | None = None,
     batch_size: int = DEFAULT_BATCH_SIZE,
+    today: str | None = None,
 ) -> ExtractResult:
     """Verifica cada candidato visitando su URL fuente y arma la ficha final.
 
@@ -330,10 +350,16 @@ def extract_fichas(
     modulo) en vez de mandar todos los candidatos en un solo turno. Si un \
     lote falla, se descarta y se sigue con el resto - no aborta la corrida \
     completa por un lote problematico.
+
+    `today` (formato YYYY-MM-DD, por defecto la fecha real de hoy) se le \
+    pasa al modelo para que descarte candidatos cuya fecha limite o fecha \
+    de inicio ya haya pasado (ver seccion "Vigencia" del SYSTEM_PROMPT) - \
+    parametrizable sobre todo para tests deterministicos.
     """
     if not candidates:
         raise ExtractError("No hay candidatos para verificar.")
 
+    today = today or date.today().isoformat()
     client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
 
     all_evaluations: list[OpportunityEvaluation] = []
@@ -344,7 +370,7 @@ def extract_fichas(
         batch = candidates[start : start + batch_size]
         try:
             batch_evaluations, batch_raw, batch_usage = _extract_batch(
-                client, batch, model, effort
+                client, batch, model, effort, today
             )
         except ExtractError as e:
             failed_batches += 1
