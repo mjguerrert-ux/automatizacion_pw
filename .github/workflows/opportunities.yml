@@ -32,15 +32,21 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      # data/opportunities_seen.json no esta versionado (es estado, no
-      # codigo) y cada corrida del workflow arranca desde un checkout
-      # limpio, asi que se persiste entre corridas con un cache: cada
-      # corrida guarda una entrada nueva (key con run_id, siempre unica) y
-      # restaura la mas reciente que matchee el prefijo restore-keys.
-      - name: Restaurar oportunidades ya vistas
+      # data/opportunities_seen.json y data/opportunities_queue.json no
+      # estan versionados (son estado, no codigo) y cada corrida del
+      # workflow arranca desde un checkout limpio, asi que se persisten
+      # entre corridas con un cache: cada corrida guarda una entrada nueva
+      # (key con run_id, siempre unica) y restaura la mas reciente que
+      # matchee el prefijo restore-keys. La cola (opportunities_queue.json)
+      # es la que limita el envio a 1 oportunidad por corrida - sin
+      # persistirla entre corridas, cada una perderia lo que quedo
+      # pendiente de mandar.
+      - name: Restaurar oportunidades ya vistas y la cola de envio
         uses: actions/cache@v4
         with:
-          path: data/opportunities_seen.json
+          path: |
+            data/opportunities_seen.json
+            data/opportunities_queue.json
           key: opportunities-seen-${{ github.run_id }}
           restore-keys: |
             opportunities-seen-

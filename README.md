@@ -255,9 +255,9 @@ y de lectura de páginas (`web_fetch`) en vez de un cliente a una API externa.
 ```
 src/opportunities/
   discovery.py  # Parte A: busca candidatos en la web (web_search)
-  extract.py    # Parte B: verifica cada candidato (web_fetch) y arma la ficha
+  extract.py    # Parte B: verifica cada candidato (web_fetch), chequea vigencia y arma la ficha
   format.py     # Arma el mensaje con la ficha fija
-  store.py      # Evita reenviar una oportunidad ya notificada en corridas previas
+  store.py      # Evita reenviar una oportunidad ya notificada + cola de envio (1/corrida)
 src/telegram/
   client.py     # Parte E: envío por Telegram vía un bot personal (compartido con papers)
 scripts/
@@ -316,6 +316,28 @@ links ya notificados/enviados, para no repetir la misma oportunidad en la
 siguiente corrida mientras siga abierta. `send_opportunities.py` solo marca
 una oportunidad como vista después de que el envío por Telegram fue exitoso;
 si falla, se reintenta en la próxima corrida.
+
+### Vigencia y cola de envío (1 oportunidad por corrida)
+
+La corrida del 7/oct mandó 6 oportunidades de una sola vez, y la mayoría ya
+estaba vencida (fecha límite o fecha de inicio ya pasada, o la posición
+cerrada/llenada) — el pipeline buscaba y verificaba sin chequear fechas.
+Dos cambios para esto:
+
+- **Chequeo de vigencia (Parte B):** `extract_fichas` le pasa a Claude la
+  fecha de hoy junto con cada candidato, y la sección "Vigencia" del
+  `SYSTEM_PROMPT` de `extract.py` le pide marcar `is_relevant=false` si la
+  página muestra una fecha límite o de inicio ya pasada, o dice
+  explícitamente que la posición ya cerró/se llenó. La ausencia de fecha no
+  descarta al candidato (muchas convocatorias no publican una).
+- **Cola de envío (`data/opportunities_queue.json`, vía `store.py`):**
+  `send_opportunities.py` agrega cada oportunidad relevante y vigente a una
+  cola FIFO, pero manda **como mucho 1 por corrida** (la más antigua en
+  espera) — el resto queda para las siguientes corridas. Una oportunidad se
+  marca "vista" apenas entra a la cola (no cuando se manda), para que
+  discovery no la vuelva a encontrar y re-verificar mientras espera turno.
+  Con el cron de lunes/miércoles/viernes, esto significa 1 oportunidad cada
+  2-3 días, no una ráfaga.
 
 ### Costo
 
@@ -443,8 +465,10 @@ cualquier rama que tenga el archivo).
 
 **Cómo persiste el estado entre corridas:** cada corrida del workflow parte
 de un checkout limpio (no hay disco persistente en GitHub Actions), así que
-`data/opportunities_seen.json` y `data/papers_sent.json` se guardan/restauran
-con `actions/cache` en vez de comprometerlos al repo — evita tanto perder el
+`data/opportunities_seen.json`, `data/opportunities_queue.json` (la cola que
+limita el envío a 1 oportunidad por corrida — ver sección anterior) y
+`data/papers_sent.json` se guardan/restauran con `actions/cache` en vez de
+comprometerlos al repo — evita tanto perder el
 historial de lo ya enviado como llenar el repo de commits automáticos.
 
 **Costo a tener en cuenta:** cada corrida hace llamados reales a la API de
