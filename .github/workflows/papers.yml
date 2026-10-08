@@ -20,6 +20,13 @@ name: Papers académicos por Telegram
 # TELEGRAM_BOT_TOKEN_PAPERS, TELEGRAM_CHAT_ID_PAPERS. Ver README > Envío
 # por Telegram para como conseguir el token/chat_id (crear un bot nuevo,
 # distinto al de oportunidades).
+#
+# OPENALEX_API_KEY es opcional pero recomendado: sin ella, cada corrida
+# cuenta contra el cupo diario ANONIMO que OpenAlex comparte entre todos
+# los que pegan desde el mismo rango de IP de GitHub Actions - se agotó el
+# 8/oct (429 "Insufficient budget"). Una key gratis (sacarla en
+# https://help.openalex.org/api/authentication/) le da cupo propio a este
+# pipeline.
 
 on:
   schedule:
@@ -58,6 +65,7 @@ jobs:
       - name: Filtrar, conseguir PDF, generar ficha y enviar por Telegram
         env:
           OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
+          OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TELEGRAM_BOT_TOKEN_PAPERS: ${{ secrets.TELEGRAM_BOT_TOKEN_PAPERS }}
           TELEGRAM_CHAT_ID_PAPERS: ${{ secrets.TELEGRAM_CHAT_ID_PAPERS }}

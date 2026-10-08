@@ -158,6 +158,18 @@ OPENALEX_MAILTO=tu@email.com ANTHROPIC_API_KEY=sk-ant-... \
 entrar en su "polite pool", que da límites de uso más altos y respuestas más
 rápidas y confiables que las llamadas anónimas.
 
+`OPENALEX_API_KEY` es **opcional pero recomendada**. Sin ella, cada corrida
+cuenta contra el cupo diario **anónimo** que OpenAlex comparte entre
+*todos* los que pegan desde el mismo rango de IP — en GitHub Actions eso
+significa compartirlo con muchísimos otros usuarios del servicio, y se
+agota con facilidad (pasó el 8/oct: `429 "Insufficient budget... $0
+remaining"`, sin que este pipeline hiciera un volumen alto). Una key
+gratuita (sacarla en
+[help.openalex.org/api/authentication](https://help.openalex.org/api/authentication/))
+le da a este pipeline su propio cupo en vez de depender del cupo anónimo
+compartido. `fetch_papers` la toma automáticamente de esta variable de
+entorno si no se pasa `api_key=...` explícitamente.
+
 `ANTHROPIC_API_KEY` es la API key de la [API de Claude](https://platform.claude.com/)
 (distinta de cualquier login de Claude Code) — necesaria para la Parte B en
 adelante. Por defecto el filtro usa `claude-opus-5`; se puede pasar un modelo
@@ -452,7 +464,9 @@ Los dos pipelines corren solos, sin intervención manual, vía GitHub Actions
    agregar:
    - Para oportunidades: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
    - Para papers: `ANTHROPIC_API_KEY` (se puede reusar el mismo secret),
-     `OPENALEX_MAILTO`, `TELEGRAM_BOT_TOKEN_PAPERS`, `TELEGRAM_CHAT_ID_PAPERS`.
+     `OPENALEX_MAILTO`, `OPENALEX_API_KEY` (opcional pero recomendada — ver
+     sección de Papers académicos, evita el 429 por cupo anónimo compartido
+     agotado), `TELEGRAM_BOT_TOKEN_PAPERS`, `TELEGRAM_CHAT_ID_PAPERS`.
 3. Mergear la rama con estos workflows a la rama default del repo (`main`) —
    los triggers de horario (`schedule`) de GitHub Actions **solo** se activan
    con la versión del workflow que está en la rama default, no en una rama
