@@ -109,12 +109,22 @@ def fetch_papers(
     sort: str = "cited_by_count:desc",
     mailto: str | None = None,
     extra_filters: str | None = None,
+    api_key: str | None = None,
 ) -> list[Paper]:
     """Trae papers de un conjunto de revistas (por OpenAlex source id), publicados
     desde `from_year` en adelante.
 
     source_ids: IDs de OpenAlex separados por '|' (OR), p.ej. "S203860005|S88935262".
         Ver src/openalex/journals.py -> source_id_filter().
+
+    api_key: opcional (o variable de entorno OPENALEX_API_KEY). Sin una key, el
+        request cuenta contra el cupo diario gratuito ANONIMO que OpenAlex
+        comparte entre todos los que pegan desde el mismo rango de IP - en
+        GitHub Actions eso es compartido con muchisimos otros usuarios, y
+        alcanza a agotarse (pasó el 8/oct: 429 "Insufficient budget... $0
+        remaining"). Una key gratuita (sacala en
+        https://help.openalex.org/api/authentication/) le da a este pipeline
+        su propio cupo en vez de depender del cupo anonimo compartido.
     """
     today = date.today()
     filters = [
@@ -125,6 +135,8 @@ def fetch_papers(
     ]
     if extra_filters:
         filters.append(extra_filters)
+
+    api_key = api_key or os.environ.get("OPENALEX_API_KEY")
 
     params = {
         "filter": ",".join(filters),
@@ -149,6 +161,8 @@ def fetch_papers(
             ]
         ),
     }
+    if api_key:
+        params["api_key"] = api_key
 
     resp = requests.get(f"{BASE_URL}/works", params=params, timeout=30)
     if resp.status_code != 200:
