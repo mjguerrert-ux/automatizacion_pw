@@ -342,6 +342,16 @@ Dos cambios para esto:
   página muestra una fecha límite o de inicio ya pasada, o dice
   explícitamente que la posición ya cerró/se llenó. La ausencia de fecha no
   descarta al candidato (muchas convocatorias no publican una).
+  **Esto solo no basta** — el 13/oct una oportunidad con fecha límite ya
+  vencida (4 de febrero de 2026, corriendo en octubre) pasó este chequeo
+  igual, porque depende de que el modelo razone bien la comparación de
+  fechas dentro del mismo texto donde arma el resto de la ficha. Por eso
+  además hay un **corte determinista en Python**: el modelo también
+  completa `deadline_iso` (la misma fecha límite en formato ISO estricto,
+  o "no especificada"), y `_extract_batch` compara esa fecha contra `today`
+  directamente en código — si ya pasó, fuerza `is_relevant=false` sin
+  importar lo que haya dicho el modelo. No depende del prompt para ser
+  correcto.
 - **Cola de envío (`data/opportunities_queue.json`, vía `store.py`):**
   `send_opportunities.py` agrega cada oportunidad relevante y vigente a una
   cola FIFO, pero manda **como mucho 1 por corrida** (la más antigua en
