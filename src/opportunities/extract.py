@@ -16,6 +16,17 @@ candidatos. Si un lote entero falla (pause_turn, rechazo), se descarta ese
 lote en vez de abortar toda la corrida (sus candidatos no quedan marcados
 como vistos, asi que se reintentan solos en la proxima corrida).
 
+El chequeo de vigencia de la seccion "Vigencia" del SYSTEM_PROMPT no es
+suficiente por si solo: el 13/oct una oportunidad con fecha limite ya
+vencida (4 de febrero de 2026, con la corrida corriendo en octubre) pasó
+ese chequeo igual - el modelo no siempre razona bien la comparacion de
+fechas dentro del mismo texto donde extrae el resto de la ficha. Por eso
+`deadline_iso` (ver schema) es un campo aparte en formato ISO estricto que
+Python compara de forma DETERMINISTICA contra `today` en
+`_extract_batch` - si la fecha limite ya paso, se fuerza is_relevant=false
+sin importar lo que haya dicho el modelo. No depende del prompt para ser
+correcto.
+
 El costo real no es tanto el modelo (`claude-sonnet-5` es barato por
 token) sino la CANTIDAD de llamadas a herramientas dentro de un mismo
 turno: cada `web_fetch`/`web_search` obliga a reenviar toda la
@@ -32,6 +43,7 @@ sino para acotar cuantas llamadas puede encadenar una sola corrida.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -157,8 +169,18 @@ usa exactamente "no especificada".
 8. apply_link: el link directo para aplicar (o, si no hay uno especifico, \
 el link a la pagina de la convocatoria).
 
+Ademas, completa SIEMPRE (incluso si is_relevant es false):
+9. deadline_iso: si el campo 6 (deadline) tiene una fecha concreta, la \
+MISMA fecha en formato ISO estricto YYYY-MM-DD (ej. "2026-03-15"). Si \
+deadline es "no especificada", o la fecha no se puede resolver a un \
+anio-mes-dia concreto, usa exactamente "no especificada" aca tambien. Un \
+proceso separado (no tu) compara esto con la fecha de hoy para descartar \
+automaticamente convocatorias vencidas, asi que tiene que ser el valor \
+literal y exacto, no una aproximacion.
+
 Si is_relevant es false, deja los campos de la ficha con valores vacios \
-("" o listas vacias) - no hace falta completarlos.\
+("" o listas vacias) - no hace falta completarlos (deadline_iso si se \
+completa siempre, ver arriba).\
 """
 
 _EXTRACT_SCHEMA = {
@@ -178,6 +200,7 @@ _EXTRACT_SCHEMA = {
                     "countries": {"type": "string"},
                     "funding": {"type": "string"},
                     "deadline": {"type": "string"},
+                    "deadline_iso": {"type": "string"},
                     "requirements": {"type": "array", "items": {"type": "string"}},
                     "apply_link": {"type": "string"},
                 },
@@ -191,6 +214,7 @@ _EXTRACT_SCHEMA = {
                     "countries",
                     "funding",
                     "deadline",
+                    "deadline_iso",
                     "requirements",
                     "apply_link",
                 ],
@@ -235,6 +259,23 @@ class ExtractResult:
     model: str
     usage: TokenUsage
     raw: dict = field(repr=False)
+
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _is_expired(deadline_iso: str, today: str) -> bool:
+    """Chequeo determinista (no depende de que el modelo razone bien sobre
+    fechas): True solo si `deadline_iso` es una fecha ISO valida y es
+    estrictamente anterior a `today`. Cualquier otra cosa (vacio, "no
+    especificada", texto no parseable) se trata como "no vencida" - la
+    ausencia/ambiguedad de fecha no es motivo para descartar."""
+    if not _ISO_DATE_RE.match(deadline_iso or ""):
+        return False
+    try:
+        return date.fromisoformat(deadline_iso) < date.fromisoformat(today)
+    except ValueError:
+        return False
 
 
 def _format_candidates(candidates: list[Candidate], today: str) -> str:
@@ -308,8 +349,19 @@ def _extract_batch(
     data = json.loads(text)
     evaluations = []
     for r in data["results"]:
+        is_relevant = r["is_relevant"]
+        reasoning = r["reasoning"]
+
+        if is_relevant and _is_expired(r.get("deadline_iso", ""), today):
+            is_relevant = False
+            reasoning = (
+                f"{reasoning} [Chequeo determinista: fecha limite "
+                f"{r['deadline_iso']} ya paso respecto a hoy ({today}) - se "
+                "descarta aunque el modelo la haya marcado como vigente.]"
+            )
+
         ficha = None
-        if r["is_relevant"]:
+        if is_relevant:
             ficha = OpportunityFicha(
                 position=r["position"],
                 institution=r["institution"],
@@ -323,8 +375,8 @@ def _extract_batch(
         evaluations.append(
             OpportunityEvaluation(
                 candidate_index=r["candidate_index"],
-                is_relevant=r["is_relevant"],
-                reasoning=r["reasoning"],
+                is_relevant=is_relevant,
+                reasoning=reasoning,
                 ficha=ficha,
             )
         )
