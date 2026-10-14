@@ -360,6 +360,16 @@ Dos cambios para esto:
   discovery no la vuelva a encontrar y re-verificar mientras espera turno.
   Con el cron de lunes/miércoles/viernes, esto significa 1 oportunidad cada
   2-3 días, no una ráfaga.
+- **`apply_link` verificado, no reconstruido:** pasó más de una vez que el
+  link mandado (ej. una posición de UNICEF Innocenti con un número de
+  referencia como `#592087`) solo cargaba el listado genérico de "Current
+  opportunities" del portal, no la convocatoria específica — el modelo
+  armaba la URL a partir del ID/patrón que veía en vez de usar una que de
+  verdad hubiera confirmado con `web_fetch`. El `SYSTEM_PROMPT` ahora deja
+  explícito que `apply_link` tiene que ser una URL que el modelo haya
+  fetcheado con éxito en ese mismo turno y haya confirmado que corresponde
+  a esa posición — nunca una reconstruida a partir de un ID o patrón que
+  "parezca" predecible.
 
 ### Costo
 

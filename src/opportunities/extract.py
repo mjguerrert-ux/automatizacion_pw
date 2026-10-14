@@ -122,6 +122,24 @@ predoc.org, etc.). Si al visitar source_url encuentras que en realidad es \
 oficial de la misma convocatoria y usa esa URL como apply_link. Si no la \
 encuentras, marca is_relevant=false.
 
+## apply_link tiene que ser una URL que REALMENTE fetcheaste, no una que \
+reconstruiste
+Portales de empleo grandes (jobs.unicef.org, jobs.worldbank.org, etc.) \
+muchas veces muestran un numero de referencia o ID de la posicion (ej. \
+"#592087") en el texto, pero esa posicion NO siempre vive en una URL \
+predecible a partir de ese numero - pasó con un UNICEF Innocenti donde el \
+link mandado solo cargaba el listado generico de "Current opportunities", \
+no la posicion especifica. Por eso: apply_link SIEMPRE tiene que ser una \
+URL que efectivamente visitaste con web_fetch EN ESTE TURNO y cuyo \
+contenido confirmaste que corresponde a esta posicion especifica - nunca \
+una URL que armaste/adivinaste a partir de un ID, titulo o patron que te \
+parezca predecible, por mas que source_url si haya cargado bien. Si la \
+pagina que fetcheaste tiene un boton/link "Apply"/"Aplicar" que apunta a \
+otra URL, fetchea tambien esa URL antes de usarla como apply_link, para \
+confirmar que carga. Si no podes confirmar con web_fetch que una URL \
+especifica carga esta posicion, usa el mismo source_url (si ese si cargo \
+la posicion correcta) en vez de inventar una mas "limpia".
+
 ## Vigencia (requisito obligatorio, no solo relevancia tematica)
 El mensaje del usuario empieza con "Fecha de hoy: YYYY-MM-DD". Una \
 convocatoria puede encajar perfecto en el track y foco tematico y seguir \
